@@ -3,26 +3,46 @@ import pygame
 pygame.init()
 size = width, height = 1100, 700
 screen = pygame.display.set_mode(size)  # , pygame.FULLSCREEN)
-tile_size = 200
+tile_size = 100
+building_collide_step = 75
 all_sprites = pygame.sprite.Group()
 player_group = pygame.sprite.Group()
 tile_group = pygame.sprite.Group()
 buildings_group = pygame.sprite.Group()
+text = None
 
 
 def generate_level(level):
     new_player, x, y = None, None, None
     for y in range(len(level)):
         for x in range(len(level[y])):
-            if level[y][x] == '.':
-                Tile('roof', x, y)
+            if level[y][x] == 'f':
+                Tile('fence', x, y)
+            elif level[y][x] == 'g':
+                Tile('grass', x, y)
             elif level[y][x] == 'r':
                 Tile('road', x, y)
             elif level[y][x] == '@':
                 Tile('road', x, y)
                 new_player = Player(x, y, all_sprites, player_group)
             elif level[y][x] == '1':
-                Tile('living_house', x, y)
+                PoisonShop(x, y)
+                Tile('grass', x, y)
+            elif level[y][x] == '2':
+                CathedralEasy(x, y)
+                Tile('grass', x, y)
+            elif level[y][x] == '3':
+                Shop(x, y)
+                Tile('grass', x, y)
+            elif level[y][x] == '4':
+                CathedralHard(x, y)
+                Tile('grass', x, y)
+            elif level[y][x] == '5':
+                LivingHouse(x, y)
+                Tile('grass', x, y)
+            elif level[y][x] == '6':
+                BigHouse(x, y)
+                Tile('grass', x, y)
     return new_player, x, y
 
 
@@ -46,6 +66,66 @@ def load_image(path, colorkey=None, size=None):
     return image
 
 
+class Building(pygame.sprite.Sprite):
+    def __init__(self, type, pos_x, pos_y, *groups):
+        groups = list(groups)
+        groups.extend([all_sprites, buildings_group])
+        super().__init__(groups)
+        self.image = tile_images[type]
+        self.rect = self.image.get_rect()
+        self.rect.x = pos_x * tile_size
+        self.rect.y = pos_y * tile_size
+        self.col_rect = pygame.Rect(self.rect.x - building_collide_step, self.rect.y - building_collide_step,
+                                    self.rect.w + building_collide_step * 2, self.rect.h + building_collide_step * 2)
+        self.name = 'not stated'
+
+    def is_obstacle(self):
+        return True
+
+
+class PoisonShop(Building):
+    def __init__(self, pos_x, pos_y, *groups):
+        super().__init__("poison_shop", pos_x, pos_y, groups)
+        self.name = 'Poison shop'
+
+
+
+class LivingHouse(Building):
+    def __init__(self, pos_x, pos_y, *groups):
+        super().__init__("living_house", pos_x, pos_y, groups)
+        self.name = "Farmer's house"
+
+
+
+class Shop(Building):
+    def __init__(self, pos_x, pos_y, *groups):
+        super().__init__("shop", pos_x, pos_y, groups)
+        self.name = 'Shop'
+
+
+
+
+class CathedralEasy(Building):
+    def __init__(self, pos_x, pos_y, *groups):
+        super().__init__("cathedral_1", pos_x, pos_y, groups)
+        self.name = 'New cathedral'
+
+
+
+class CathedralHard(Building):
+    def __init__(self, pos_x, pos_y, *groups):
+        super().__init__("cathedral_2", pos_x, pos_y, groups)
+        self.name = 'Old cathedral'
+
+
+
+class BigHouse(Building):
+    def __init__(self, pos_x, pos_y, *groups):
+        super().__init__("big_house", pos_x, pos_y, groups)
+        self.name = "Old Whateley's house"
+
+
+
 class Camera:
     def __init__(self):
         self.dx = 0
@@ -54,6 +134,8 @@ class Camera:
     def apply(self, obj):
         obj.rect.x += self.dx
         obj.rect.y += self.dy
+        obj.col_rect.x += self.dx
+        obj.col_rect.y += self.dy
 
     def update(self, target):
         self.dx = -(target.rect.x + target.rect.w // 2 - width // 2)
@@ -64,19 +146,17 @@ class Tile(pygame.sprite.Sprite):
     def __init__(self, type, pos_x, pos_y, *groups):
         groups = list(groups)
         groups.append(all_sprites)
-        if type not in ['road', 'wall', 'roof']:
-            groups.append(buildings_group)
         super().__init__(groups)
         self.type = type
         self.image = tile_images[type]
         self.rect = self.image.get_rect()
         self.rect.x = pos_x * tile_size
         self.rect.y = pos_y * tile_size
-        self.rect.w -= 50
-        self.rect.h -= 50
+        self.col_rect = pygame.Rect(self.rect.x - building_collide_step, self.rect.y - building_collide_step,
+                                    self.rect.w + building_collide_step, self.rect.h + building_collide_step)
 
     def is_obstacle(self):
-        if self.type in ['road']:
+        if self.type in ['road', 'grass', "roof"]:
             return False
         return True
 
@@ -111,6 +191,8 @@ class Player(pygame.sprite.Sprite):
         self.prev_coords = self.get_coords()
         self.num = 0
         self.pos = (self.rect.x + 10, self.rect.y)
+        self.col_rect = pygame.Rect(self.rect.x - building_collide_step, self.rect.y - building_collide_step,
+                                    self.rect.w + building_collide_step, self.rect.h + building_collide_step)
 
     '''def cut_sheet(self, sheet, columns, rows):
         self.rect = pygame.Rect(0, 0, sheet.get_width() // columns,
@@ -176,19 +258,47 @@ def distance(coords_1, coords_2):
 
 
 def check_collisions(obj):
+    global text
+    a = None
     for sprite in all_sprites:
         if id(sprite) == id(obj):
             continue
         if sprite.is_obstacle() and sprite.rect.colliderect(obj.rect):
+            check_active_zones(obj)
             return True
+    check_active_zones(obj)
     return False
+
+
+def check_active_zones(obj):
+    global text
+    for sprite in all_sprites:
+        if id(sprite) == id(obj):
+            continue
+        if sprite.is_obstacle() and sprite.col_rect.colliderect(obj.rect) and not isinstance(sprite, Tile):
+            font = pygame.font.Font(None, 50)
+            text = font.render("[E] - enter " + sprite.name, 1, (47, 213, 175))
+            text_x = width // 2 - text.get_width() // 2
+            text_y = height // 2 - text.get_height() // 2
+            screen.blit(text, (text_x, text_y))
+            return
+    text = None
+
+
+def create_col_rect(obj):
+    obj.col_rect = pygame.Rect(obj.rect.x - building_collide_step, obj.rect.y - building_collide_step,
+                               obj.rect.w + building_collide_step, obj.rect.h + building_collide_step)
 
 
 tile_images = {"road": load_image("data/textures/stone_1.png", (255, 0, 0), (tile_size, tile_size)),
                "living_house": load_image("data/houses/sleep_house.png", (255, 0, 0), (tile_size * 2, tile_size)),
                "poison_shop": load_image("data/houses/poison_shop.png", (255, 0, 0), (tile_size * 2, tile_size)),
-               "shop": load_image("data/houses/shop_1.png", (255, 0, 0), (tile_size * 2, tile_size)),
-               "roof": load_image("data/textures/roof_1.png", (255, 0, 0), (tile_size, tile_size))}
+               "shop": load_image("data/houses/shop_1.png", (255, 0, 0), (tile_size * 2, tile_size * 3)),
+               "grass": load_image("data/textures/grass.png", (255, 0, 0), (tile_size, tile_size)),
+               "fence": load_image("data/textures/roof_1.png", (255, 0, 0), (tile_size, tile_size)),
+               "cathedral_1": load_image("data/houses/cathedral_1.png", (255, 0, 0), (tile_size * 5, tile_size * 2)),
+               "cathedral_2": load_image("data/houses/cathedral_2.png", (255, 0, 0), (tile_size * 3, tile_size * 2)),
+               "big_house": load_image("data/houses/big_house.png", (255, 0, 0), (tile_size * 2, tile_size * 2))}
 tile_images['road'].set_alpha(150)
 player, level_x, level_y = generate_level(load_level('data/levels/city.dat'))
 fps = 60
@@ -219,5 +329,7 @@ while running:
     all_sprites.draw(screen)
     buildings_group.draw(screen)
     player_group.draw(screen)
+    if text:
+        screen.blit(text, (0, 0))
     pygame.display.flip()
     clock.tick(fps)
