@@ -10,6 +10,7 @@ player_group = pygame.sprite.Group()
 tile_group = pygame.sprite.Group()
 buildings_group = pygame.sprite.Group()
 button_group = pygame.sprite.Group()
+player_info_group = pygame.sprite.Group()
 text = None
 door = None
 
@@ -88,28 +89,126 @@ class Building(pygame.sprite.Sprite):
         pass
 
 
+# единица отрисовки в магазине
+# notice the way i work with prod. I call get_disc() and so on
+class Product(pygame.sprite.Sprite):
+    def __init__(self, pos_x, pos_y, w, h, prod, *groups):
+        super().__init__(groups)
+        # prod - object we can buy
+        '''self.image = pygame.transform.scale(prod.get_image(), (w, h))
+        self.disc = prod.get_disc()
+        self.price = prod.get_price()
+        self.name = prod.get_name'''
+        # example
+        self.prod = prod
+        self.disc = '123\n456\n\n789'
+        self.price = 456
+        self.name = 'the first product'
+
+        self.image = pygame.transform.scale(tile_images["empty"], (w, h))
+        self.rect = self.image.get_rect()
+        self.rect.x, self.rect.y, self.rect.w, self.rect.h = pos_x, pos_y, w, h
+
+    def get_price(self):
+        return self.price
+
+    # returns sprite with black background and text information in the corner
+    def show_info(self, screen):
+        size = screen.get_rect()
+        w, h = size.w, size.h
+        new = pygame.display.set_mode((w, h))
+        new.fill((0, 0, 0))
+
+        font = pygame.font.Font(None, 50)
+        text = font.render(self.name, 1, (255, 255, 255))
+        new.blit(text, (500, 300))
+
+        text = font.render('Price: ' + str(self.price), 1, (142, 176, 215))
+        new.blit(text, (500, 350))
+
+        data = self.disc.split('\n')
+        font = pygame.font.Font(None, 30)
+        for i in range(len(data)):
+            text = font.render(data[i], 1, (142, 176, 215))
+            new.blit(text, (500, 400 + i * 25))
+        # this is the bigger picture of the selected item
+        image_sprite = pygame.sprite.Sprite()
+        # image_sprite.image = pygame.transform.scale(self.prod.image, (100, 100))
+        image_sprite.image = pygame.transform.scale(self.image, (100, 100))
+        image_sprite.rect = image_sprite.image.get_rect()
+        image_sprite.rect.x, image_sprite.rect.y = 864, 163
+        gr = pygame.sprite.Group()
+        gr.add(image_sprite)
+        gr.draw(new)
+
+        info_sprite = pygame.sprite.Sprite()
+        info_sprite.image = pygame.transform.scale(new, (w, h))
+        info_sprite.rect = info_sprite.image.get_rect()
+
+        return info_sprite
+
+
 class PoisonShop(Building):
     def __init__(self, pos_x, pos_y, *groups):
         super().__init__("poison_shop", pos_x, pos_y, groups)
         self.name = 'Poison shop'
 
+    # enter is called when we enter he building
     def enter(self, player):
+        buttons = pygame.sprite.Group()
+        size = screen.get_rect()
+        width, height = size.w, size.h
+        fps = 60
         shop_buttons = pygame.sprite.Group()
+        products = pygame.sprite.Group()
         running = True
         clock = pygame.time.Clock()
         pos = (0, 0)
-        Button(100, 100, 50, 50, load_image("data/other/empty.png"), None, shop_buttons)
+        info_screen = None
+        selected_prod = None
+        Button(width - 50, 0, 50, 50, load_image("data/other/exit_button.png",
+                                                 (0, 0, 255), (50, 50)), shop_interface_end, products, buttons)
+        buy_image = render_text('Buy!')
+        Button(900, 600, buy_image.get_width(), buy_image.get_height(), buy_image,
+               None, buttons)
+        for i in range(5):
+            for j in range(5):
+                Product(100 + i * 50, 100 + j * 50, 50, 50, None, products)
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    quit()
                     running = False
                 if event.type == pygame.MOUSEMOTION:
                     pos = event.pos
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    pos = event.pos
+                    # if we clicked on product
+                    for prod in products:
+                        if prod.rect.collidepoint(pos):
+                            if isinstance(prod, Product):
+                                info_screen = prod.show_info(screen)
+                                shop_buttons.add(info_screen)
+                                selected_prod = prod
+                    # if we clicked on button
+                    for btn in buttons:
+                        if btn.rect.collidepoint(pos) and isinstance(btn, Button):
+                            try:
+                                running = btn.run(btn)
+                            except TypeError:
+                                pass
             data = pygame.key.get_pressed()
             screen.fill((0, 0, 0))
+            '''if info_screen:
+                info_screen.blit(screen, (0, 0))'''
             shop_buttons.draw(screen)
+            products.draw(screen)
+            buttons.draw(screen)
             pygame.display.flip()
             clock.tick(fps)
+        # deleting all buttons
+        for btn in buttons:
+            shop_interface_end(btn)
 
 
 class LivingHouse(Building):
@@ -161,6 +260,8 @@ class Camera:
         self.dy = -(target.rect.y + target.rect.h // 2 - height // 2)
 
 
+# notice new methods of getting helth, money, rect
+# notice new attributes (money, health)
 class Player(pygame.sprite.Sprite):
     step = 1
 
@@ -193,6 +294,27 @@ class Player(pygame.sprite.Sprite):
         self.pos = (self.rect.x + 10, self.rect.y)
         self.col_rect = pygame.Rect(self.rect.x - building_collide_step, self.rect.y - building_collide_step,
                                     self.rect.w + building_collide_step, self.rect.h + building_collide_step)
+        self.health = 100
+        self.poisons = []
+        self.weapons = []
+        self.money = 10000
+
+    # notice calls of expected classes Weapon nd Poison
+    def add_product(self, prod):
+        if isinstance(prod, Weapon):
+            self.weapons.append(prod)
+        elif isinstance(prod, Poison):
+            self.poisons.append(prod)
+        return True
+
+    def reduce_money(self, amount):
+        prev = self.money
+        self.money -= amount
+        if self.money >= 0:
+            return True
+        else:
+            self.money = prev
+            return False
 
     '''def cut_sheet(self, sheet, columns, rows):
         self.rect = pygame.Rect(0, 0, sheet.get_width() // columns,
@@ -203,6 +325,12 @@ class Player(pygame.sprite.Sprite):
                 self.frames.append(sheet.subsurface(pygame.Rect(
                     frame_location, self.rect.size)))'''
 
+    def get_health(self):
+        return self.health
+
+    def get_money(self):
+        return self.money
+
     def get_x(self):
         return self.rect.x
 
@@ -211,6 +339,9 @@ class Player(pygame.sprite.Sprite):
 
     def get_coords(self):
         return (self.get_x(), self.get_y())
+
+    def get_info(self):
+        return self.money, self.health
 
     def move_point(self, pos, forward):
         x, y = pos
@@ -286,8 +417,8 @@ class Button(pygame.sprite.Sprite):
         self.frames[1].set_alpha(300)
         self.image = self.frames[0]
 
-    def run(self):
-        self.func()
+    def run(self, *args):
+        self.func(*args)
 
     def check_selection(self, pos):
         if self.rect.collidepoint(pos):
@@ -329,7 +460,7 @@ def check_active_zones(obj):
             text = font.render("[E] - enter " + sprite.name, 1, (47, 213, 175))
             text_x = width // 2 - text.get_width() // 2
             text_y = height // 2 - text.get_height() // 2
-            screen.blit(text, (text_x, text_y))
+            # screen.blit(text, (text_x, text_y))
             door = sprite
             return
     door = None
@@ -341,8 +472,36 @@ def create_col_rect(obj):
                                obj.rect.w + building_collide_step, obj.rect.h + building_collide_step)
 
 
+# KOSTIL))   deleting buttons after shop interface
+def shop_interface_end(*args):
+    args[0].kill()
+    return False
+
+
+# renfering main info about player
+# returns surface with the text
+def render_info(player, screen):
+    money, health = player.get_info()
+    font = pygame.font.Font(None, 30)
+    text = font.render(f'{str(money)}  coins     {str(health)}     health', 1, (255, 255, 255))
+    # new = pygame.display.set_mode((text.get_width(), text.get_height()))
+    # new.fill((122, 86, 33))
+    # new.blit(text, (0, 0))
+    return text
+
+
+# renders any text
+# returns Surface
+def render_text(line):
+    font = pygame.font.Font(None, 50)
+    text = font.render(line, 1, (255, 255, 255))
+    return text
+
+
+# nothing, but it works)
 def test():
     quit()
+
 
 tile_images = {"road": load_image("data/textures/stone_1.png", (255, 0, 0), (tile_size, tile_size)),
                "living_house": load_image("data/houses/sleep_house.png", (255, 0, 0), (tile_size * 2, tile_size)),
@@ -352,12 +511,13 @@ tile_images = {"road": load_image("data/textures/stone_1.png", (255, 0, 0), (til
                "fence": load_image("data/textures/roof_1.png", (255, 0, 0), (tile_size, tile_size)),
                "cathedral_1": load_image("data/houses/cathedral_1.png", (255, 0, 0), (tile_size * 5, tile_size * 2)),
                "cathedral_2": load_image("data/houses/cathedral_2.png", (255, 0, 0), (tile_size * 3, tile_size * 2)),
-               "big_house": load_image("data/houses/big_house.png", (255, 0, 0), (tile_size * 2, tile_size * 2))}
+               "big_house": load_image("data/houses/big_house.png", (255, 0, 0), (tile_size * 2, tile_size * 2)),
+               "empty": load_image("data/other/empty.png", (255, 0, 0), (tile_size * 2, tile_size * 2))}
 tile_images['road'].set_alpha(150)
 player, level_x, level_y = generate_level(load_level('data/levels/city.dat'))
 fps = 60
-'''a = PoisonShop(0, 0)
-a.enter(player)'''
+a = PoisonShop(0, 0)
+a.enter(player)
 running = True
 clock = pygame.time.Clock()
 pos = (0, 0)
@@ -399,6 +559,7 @@ while running:
     buildings_group.draw(screen)
     player_group.draw(screen)
     if text:
-        screen.blit(text, (0, 0))
+        screen.blit(text, (0, height - 30))
+    screen.blit(render_info(player, screen), (0, 0))
     pygame.display.flip()
     clock.tick(fps)
