@@ -56,13 +56,11 @@ def load_level(filename):
 
 
 def load_image(path, colorkey=None, size=None):
-    image = pygame.image.load(path).convert()
+    image = pygame.image.load(path).convert_alpha()
     if colorkey is not None:
         if colorkey == -1:
             colorkey = image.get_at((0, 0))
         image.set_colorkey(colorkey)
-    else:
-        image = image.convert_alpha()
     if size:
         image = pygame.transform.scale(image, size)
     return image
@@ -77,8 +75,10 @@ class Building(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x = pos_x * tile_size
         self.rect.y = pos_y * tile_size
-        self.col_rect = pygame.Rect(self.rect.x - building_collide_step, self.rect.y - building_collide_step,
-                                    self.rect.w + building_collide_step * 2, self.rect.h + building_collide_step * 2)
+        self.col_rect = pygame.Rect(self.rect.x - building_collide_step,
+                                    self.rect.y - building_collide_step,
+                                    self.rect.w + building_collide_step * 2,
+                                    self.rect.h + building_collide_step * 2)
         self.name = 'not stated'
 
     def is_obstacle(self):
@@ -191,8 +191,10 @@ class Player(pygame.sprite.Sprite):
         self.prev_coords = self.get_coords()
         self.num = 0
         self.pos = (self.rect.x + 10, self.rect.y)
-        self.col_rect = pygame.Rect(self.rect.x - building_collide_step, self.rect.y - building_collide_step,
-                                    self.rect.w + building_collide_step, self.rect.h + building_collide_step)
+        self.col_rect = pygame.Rect(self.rect.x - building_collide_step,
+                                    self.rect.y - building_collide_step,
+                                    self.rect.w + building_collide_step,
+                                    self.rect.h + building_collide_step)
 
     '''def cut_sheet(self, sheet, columns, rows):
         self.rect = pygame.Rect(0, 0, sheet.get_width() // columns,
@@ -260,8 +262,10 @@ class Tile(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x = pos_x * tile_size
         self.rect.y = pos_y * tile_size
-        self.col_rect = pygame.Rect(self.rect.x - building_collide_step, self.rect.y - building_collide_step,
-                                    self.rect.w + building_collide_step, self.rect.h + building_collide_step)
+        self.col_rect = pygame.Rect(self.rect.x - building_collide_step,
+                                    self.rect.y - building_collide_step,
+                                    self.rect.w + building_collide_step,
+                                    self.rect.h + building_collide_step)
 
     def is_obstacle(self):
         if self.type in ['road', 'grass', "roof"]:
@@ -324,7 +328,8 @@ def check_active_zones(obj):
     for sprite in all_sprites:
         if id(sprite) == id(obj):
             continue
-        if sprite.is_obstacle() and sprite.col_rect.colliderect(obj.rect) and not isinstance(sprite, Tile):
+        if sprite.is_obstacle() and sprite.col_rect.colliderect(obj.rect) and not isinstance(sprite,
+                                                                                             Tile):
             font = pygame.font.Font(None, 50)
             text = font.render("[E] - enter " + sprite.name, 1, (47, 213, 175))
             text_x = width // 2 - text.get_width() // 2
@@ -336,23 +341,80 @@ def check_active_zones(obj):
     text = None
 
 
+class Potion(pygame.sprite.Sprite):
+    def __init__(self, effect, price, *groups):
+        super().__init__(groups)
+        effects = effect.split('+')
+        if isinstance(effects, list):
+            self.coof = int(effects[1]) + 1
+            self.effect = effects[0]
+        else:
+            self.coof = 1
+            self.effect = effects
+        self.price = price
+        self.image = pygame.Surface((200, 200))
+        if self.effect == 'h':
+            image = load_image(r'potions\healing_potion.png')
+            self.text = 'Зелье Лечения' + f' +{self.coof}' if self.coof > 1 else ''
+        elif self.effect == 's':
+            image = load_image(r'potions\speed_potion.png')
+            self.text = 'Зелье Скорости' + f' +{self.coof}' if self.coof > 1 else ''
+        elif self.effect == 'd':
+            image = load_image(r'potions\damage_potion.png')
+            self.text = 'Зелье Скорости' + f' +{self.coof}' if self.coof > 1 else ''
+        else:
+            raise ValueError('Effect must be "h"eal, "s"peed or "d"amage, with +"int" or without')
+
+        self.text = 'Зелье Лечения' + f' +{self.coof}' if self.coof > 1 else ''
+
+        image = resize_image(image, 120)
+        x = image.get_rect().x
+        self.image.blit(image, (200 - x) // 2, 40)
+        pygame.draw.rect(self.image, (0, 255, 0), self.image.get_rect(), 1)
+
+        font = pygame.font.Font(None, 35)
+        self.image.blit(font.render(self.text, 1, (0, 255, 0)), (0, 0))
+        self.image.blit(font.render(self.price, 1, (0, 255, 0)), (0, 165))
+
+    def do_effect(self, player):
+        if self.effect == 'h':
+            pass
+        elif self.effect == 's':
+            pass
+        elif self.effect == 'd':
+            pass
+
+def resize_image(image, biggest_side):
+    x, y = image.get_rect().w, image.get_rect().h
+    prop = biggest_side / max((x, y))
+    return pygame.transform.scale(int(x * prop), int(y * prop))
+
 def create_col_rect(obj):
-    obj.col_rect = pygame.Rect(obj.rect.x - building_collide_step, obj.rect.y - building_collide_step,
-                               obj.rect.w + building_collide_step, obj.rect.h + building_collide_step)
+    obj.col_rect = pygame.Rect(obj.rect.x - building_collide_step,
+                               obj.rect.y - building_collide_step,
+                               obj.rect.w + building_collide_step,
+                               obj.rect.h + building_collide_step)
 
 
 def test():
     quit()
 
+
 tile_images = {"road": load_image("data/textures/stone_1.png", (255, 0, 0), (tile_size, tile_size)),
-               "living_house": load_image("data/houses/sleep_house.png", (255, 0, 0), (tile_size * 2, tile_size)),
-               "poison_shop": load_image("data/houses/poison_shop.png", (255, 0, 0), (tile_size * 2, tile_size)),
-               "shop": load_image("data/houses/shop_1.png", (255, 0, 0), (tile_size * 2, tile_size * 3)),
+               "living_house": load_image("data/houses/sleep_house.png", (255, 0, 0),
+                                          (tile_size * 2, tile_size)),
+               "poison_shop": load_image("data/houses/poison_shop.png", (255, 0, 0),
+                                         (tile_size * 2, tile_size)),
+               "shop": load_image("data/houses/shop_1.png", (255, 0, 0),
+                                  (tile_size * 2, tile_size * 3)),
                "grass": load_image("data/textures/grass.png", (255, 0, 0), (tile_size, tile_size)),
                "fence": load_image("data/textures/roof_1.png", (255, 0, 0), (tile_size, tile_size)),
-               "cathedral_1": load_image("data/houses/cathedral_1.png", (255, 0, 0), (tile_size * 5, tile_size * 2)),
-               "cathedral_2": load_image("data/houses/cathedral_2.png", (255, 0, 0), (tile_size * 3, tile_size * 2)),
-               "big_house": load_image("data/houses/big_house.png", (255, 0, 0), (tile_size * 2, tile_size * 2))}
+               "cathedral_1": load_image("data/houses/cathedral_1.png", (255, 0, 0),
+                                         (tile_size * 5, tile_size * 2)),
+               "cathedral_2": load_image("data/houses/cathedral_2.png", (255, 0, 0),
+                                         (tile_size * 3, tile_size * 2)),
+               "big_house": load_image("data/houses/big_house.png", (255, 0, 0),
+                                       (tile_size * 2, tile_size * 2))}
 tile_images['road'].set_alpha(150)
 player, level_x, level_y = generate_level(load_level('data/levels/city.dat'))
 fps = 60
