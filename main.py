@@ -3,13 +3,15 @@ import pygame
 pygame.init()
 size = width, height = 1100, 700
 screen = pygame.display.set_mode(size)  # , pygame.FULLSCREEN)
-tile_size = 100
+tile_size = 200
 building_collide_step = 75
 all_sprites = pygame.sprite.Group()
 player_group = pygame.sprite.Group()
 tile_group = pygame.sprite.Group()
 buildings_group = pygame.sprite.Group()
+button_group = pygame.sprite.Group()
 text = None
+door = None
 
 
 def generate_level(level):
@@ -82,12 +84,32 @@ class Building(pygame.sprite.Sprite):
     def is_obstacle(self):
         return True
 
+    def enter(self, player):
+        pass
+
 
 class PoisonShop(Building):
     def __init__(self, pos_x, pos_y, *groups):
         super().__init__("poison_shop", pos_x, pos_y, groups)
         self.name = 'Poison shop'
 
+    def enter(self, player):
+        shop_buttons = pygame.sprite.Group()
+        running = True
+        clock = pygame.time.Clock()
+        pos = (0, 0)
+        Button(100, 100, 50, 50, load_image("data/other/empty.png"), None, shop_buttons)
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                if event.type == pygame.MOUSEMOTION:
+                    pos = event.pos
+            data = pygame.key.get_pressed()
+            screen.fill((0, 0, 0))
+            shop_buttons.draw(screen)
+            pygame.display.flip()
+            clock.tick(fps)
 
 
 class LivingHouse(Building):
@@ -96,13 +118,10 @@ class LivingHouse(Building):
         self.name = "Farmer's house"
 
 
-
 class Shop(Building):
     def __init__(self, pos_x, pos_y, *groups):
         super().__init__("shop", pos_x, pos_y, groups)
         self.name = 'Shop'
-
-
 
 
 class CathedralEasy(Building):
@@ -111,19 +130,16 @@ class CathedralEasy(Building):
         self.name = 'New cathedral'
 
 
-
 class CathedralHard(Building):
     def __init__(self, pos_x, pos_y, *groups):
         super().__init__("cathedral_2", pos_x, pos_y, groups)
         self.name = 'Old cathedral'
 
 
-
 class BigHouse(Building):
     def __init__(self, pos_x, pos_y, *groups):
         super().__init__("big_house", pos_x, pos_y, groups)
         self.name = "Old Whateley's house"
-
 
 
 class Camera:
@@ -134,31 +150,15 @@ class Camera:
     def apply(self, obj):
         obj.rect.x += self.dx
         obj.rect.y += self.dy
-        obj.col_rect.x += self.dx
-        obj.col_rect.y += self.dy
+        try:
+            obj.col_rect.x += self.dx
+            obj.col_rect.y += self.dy
+        except AttributeError:
+            pass
 
     def update(self, target):
         self.dx = -(target.rect.x + target.rect.w // 2 - width // 2)
         self.dy = -(target.rect.y + target.rect.h // 2 - height // 2)
-
-
-class Tile(pygame.sprite.Sprite):
-    def __init__(self, type, pos_x, pos_y, *groups):
-        groups = list(groups)
-        groups.append(all_sprites)
-        super().__init__(groups)
-        self.type = type
-        self.image = tile_images[type]
-        self.rect = self.image.get_rect()
-        self.rect.x = pos_x * tile_size
-        self.rect.y = pos_y * tile_size
-        self.col_rect = pygame.Rect(self.rect.x - building_collide_step, self.rect.y - building_collide_step,
-                                    self.rect.w + building_collide_step, self.rect.h + building_collide_step)
-
-    def is_obstacle(self):
-        if self.type in ['road', 'grass', "roof"]:
-            return False
-        return True
 
 
 class Player(pygame.sprite.Sprite):
@@ -250,6 +250,55 @@ class Player(pygame.sprite.Sprite):
             self.num = 1
 
 
+class Tile(pygame.sprite.Sprite):
+    def __init__(self, type, pos_x, pos_y, *groups):
+        groups = list(groups)
+        groups.append(all_sprites)
+        super().__init__(groups)
+        self.type = type
+        self.image = tile_images[type]
+        self.rect = self.image.get_rect()
+        self.rect.x = pos_x * tile_size
+        self.rect.y = pos_y * tile_size
+        self.col_rect = pygame.Rect(self.rect.x - building_collide_step, self.rect.y - building_collide_step,
+                                    self.rect.w + building_collide_step, self.rect.h + building_collide_step)
+
+    def is_obstacle(self):
+        if self.type in ['road', 'grass', "roof"]:
+            return False
+        return True
+
+
+class Button(pygame.sprite.Sprite):
+    def __init__(self, x, y, w, h, image, func, *groups):
+        groups = list(groups)
+        groups.extend([button_group, buildings_group])
+        super().__init__(groups)
+        self.h = h
+        self.w = w
+        self.image = pygame.transform.scale(image, (self.w, self.h))
+        # self.image = image
+        self.rect = self.image.get_rect()
+        self.func = func
+        self.rect.x, self.rect.y = x, y
+        self.frames = [self.image] * 2
+        self.frames[0].set_alpha(50)
+        self.frames[1].set_alpha(300)
+        self.image = self.frames[0]
+
+    def run(self):
+        self.func()
+
+    def check_selection(self, pos):
+        if self.rect.collidepoint(pos):
+            self.image = self.frames[1]
+        else:
+            self.image = self.frames[0]
+
+    def is_obstacle(self):
+        return False
+
+
 def distance(coords_1, coords_2):
     x1, y1 = coords_1
     x2, y2 = coords_2
@@ -271,7 +320,7 @@ def check_collisions(obj):
 
 
 def check_active_zones(obj):
-    global text
+    global text, door
     for sprite in all_sprites:
         if id(sprite) == id(obj):
             continue
@@ -281,7 +330,9 @@ def check_active_zones(obj):
             text_x = width // 2 - text.get_width() // 2
             text_y = height // 2 - text.get_height() // 2
             screen.blit(text, (text_x, text_y))
+            door = sprite
             return
+    door = None
     text = None
 
 
@@ -289,6 +340,9 @@ def create_col_rect(obj):
     obj.col_rect = pygame.Rect(obj.rect.x - building_collide_step, obj.rect.y - building_collide_step,
                                obj.rect.w + building_collide_step, obj.rect.h + building_collide_step)
 
+
+def test():
+    quit()
 
 tile_images = {"road": load_image("data/textures/stone_1.png", (255, 0, 0), (tile_size, tile_size)),
                "living_house": load_image("data/houses/sleep_house.png", (255, 0, 0), (tile_size * 2, tile_size)),
@@ -302,17 +356,28 @@ tile_images = {"road": load_image("data/textures/stone_1.png", (255, 0, 0), (til
 tile_images['road'].set_alpha(150)
 player, level_x, level_y = generate_level(load_level('data/levels/city.dat'))
 fps = 60
+'''a = PoisonShop(0, 0)
+a.enter(player)'''
 running = True
 clock = pygame.time.Clock()
 pos = (0, 0)
 camera = Camera()
 camera.update(player)
+Button(width - 35, 0, 35, 35, load_image("data/other/exit_button.png", colorkey=(0, 0, 255)), test,
+       button_group, buildings_group)
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         if event.type == pygame.MOUSEMOTION:
             pos = event.pos
+            for btn in button_group:
+                btn.check_selection(pos)
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            pos = event.pos
+            for btn in button_group:
+                if btn.rect.collidepoint(pos):
+                    btn.run()
     data = pygame.key.get_pressed()
     player.set_moving(False)
     if data[119]:
@@ -321,12 +386,16 @@ while running:
     elif data[115]:
         player.move_point(pos, False)
         player.set_moving(Tile)
+    elif data[101]:
+        if door:
+            door.enter(player)
     screen.fill((0, 0, 0))
     camera.update(player)
     for sprite in all_sprites:
         camera.apply(sprite)
     all_sprites.update(pos)
     all_sprites.draw(screen)
+    button_group.draw(screen)
     buildings_group.draw(screen)
     player_group.draw(screen)
     if text:
