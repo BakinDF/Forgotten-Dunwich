@@ -384,6 +384,11 @@ class Potion(pygame.sprite.Sprite):
         elif self.effect == 'd':
             pass
 
+
+class Weapon(pygame.sprite.Sprite):
+    def __init__(self):
+        pass
+
 def resize_image(image, biggest_side):
     x, y = image.get_rect().w, image.get_rect().h
     prop = biggest_side / max((x, y))
