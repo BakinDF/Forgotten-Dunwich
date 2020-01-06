@@ -56,11 +56,13 @@ def load_level(filename):
 
 
 def load_image(path, colorkey=None, size=None):
-    image = pygame.image.load(path).convert_alpha()
+    image = pygame.image.load(path).convert()
     if colorkey is not None:
         if colorkey == -1:
             colorkey = image.get_at((0, 0))
         image.set_colorkey(colorkey)
+    else:
+        image.convert_alpha()
     if size:
         image = pygame.transform.scale(image, size)
     return image
@@ -195,15 +197,6 @@ class Player(pygame.sprite.Sprite):
                                     self.rect.y - building_collide_step,
                                     self.rect.w + building_collide_step,
                                     self.rect.h + building_collide_step)
-
-    '''def cut_sheet(self, sheet, columns, rows):
-        self.rect = pygame.Rect(0, 0, sheet.get_width() // columns,
-                                sheet.get_height() // rows)
-        for j in range(rows):
-            for i in range(columns):
-                frame_location = (self.rect.w * i, self.rect.h * j)
-                self.frames.append(sheet.subsurface(pygame.Rect(
-                    frame_location, self.rect.size)))'''
 
     def get_x(self):
         return self.rect.x
@@ -341,7 +334,21 @@ def check_active_zones(obj):
     text = None
 
 
-class Potion(pygame.sprite.Sprite):
+def Item(pygame.sprite.Sprite):
+    def change_image(self, image, image_size=200):
+        self.image = pygame.Surface((image_size,) * 2)
+        self.rect = self.image.get_rect()
+        image = resize_image(image, int(image_size * 0.6))
+        x = image.get_rect().x
+        self.image.blit(image, (image_size - x) // 2, int(image_size * 0.2))
+        pygame.draw.rect(self.image, (0, 255, 0), self.image.get_rect(), 1)
+
+        font = pygame.font.Font(None, 35)
+        self.image.blit(font.render(self.text, 1, (0, 255, 0)), (0, 0))
+        self.image.blit(font.render(self.price, 1, (0, 255, 0)), (0, int(image_size * 0.2) + 5))
+
+
+class Potion(Item):
     def __init__(self, effect, price, *groups):
         super().__init__(groups)
         effects = effect.split('+')
@@ -352,7 +359,6 @@ class Potion(pygame.sprite.Sprite):
             self.coof = 1
             self.effect = effects
         self.price = price
-        self.image = pygame.Surface((200, 200))
         if self.effect == 'h':
             image = load_image(r'potions\healing_potion.png')
             self.text = 'Зелье Лечения' + f' +{self.coof}' if self.coof > 1 else ''
@@ -367,14 +373,8 @@ class Potion(pygame.sprite.Sprite):
 
         self.text = 'Зелье Лечения' + f' +{self.coof}' if self.coof > 1 else ''
 
-        image = resize_image(image, 120)
-        x = image.get_rect().x
-        self.image.blit(image, (200 - x) // 2, 40)
-        pygame.draw.rect(self.image, (0, 255, 0), self.image.get_rect(), 1)
+        self.change_image(image)
 
-        font = pygame.font.Font(None, 35)
-        self.image.blit(font.render(self.text, 1, (0, 255, 0)), (0, 0))
-        self.image.blit(font.render(self.price, 1, (0, 255, 0)), (0, 165))
 
     def do_effect(self, player):
         if self.effect == 'h':
@@ -383,11 +383,35 @@ class Potion(pygame.sprite.Sprite):
             pass
         elif self.effect == 'd':
             pass
+        self.kill()
+
+class Weapon(Item):
+    def __init__(self, name, damage, price, sprite=0):
+        self.damage = damage
+        self.price = price
+        self.name = name
+
+        self.change_image(cut_sheet(load_image(r'data\weapons\data.png'), 13, 11, sprite))
+
+    def do_damage(self, pos):
+        for sprite in enemies:  # Группа спрайтов с врагами
+            if sprite.rect.collidepoint(pos):
+                sprite.get_damage(self.damage)  # У врагов должна быть функция get_damage(damage)
 
 
-class Weapon(pygame.sprite.Sprite):
-    def __init__(self):
-        pass
+def cut_sheet(sheet, columns, rows, number):
+    rect = pygame.Rect(0, 0, sheet.get_width() // columns,
+                            sheet.get_height() // rows)
+    frames = []
+    for j in range(rows):
+        for i in range(columns):
+            frame_location = (rect.w * i, rect.h * j)
+            frames.append(sheet.subsurface(pygame.Rect(
+                frame_location, self.rect.size)))
+    if frames:
+        return frames[number:number + 1][0]
+    raise ValueError('Number is bigger than possible sprite')
+
 
 def resize_image(image, biggest_side):
     x, y = image.get_rect().w, image.get_rect().h
