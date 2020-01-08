@@ -3,7 +3,7 @@ import pygame
 pygame.init()
 size = width, height = 1100, 700
 screen = pygame.display.set_mode(size)  # , pygame.FULLSCREEN)
-tile_size = 200
+tile_size = 50
 building_collide_step = 75
 all_sprites = pygame.sprite.Group()
 player_group = pygame.sprite.Group()
@@ -11,8 +11,11 @@ tile_group = pygame.sprite.Group()
 buildings_group = pygame.sprite.Group()
 button_group = pygame.sprite.Group()
 player_info_group = pygame.sprite.Group()
+trap_group = pygame.sprite.Group()
+enemy_group = pygame.sprite.Group()
 text = None
 door = None
+delt_x, delt_y = 0, 0
 
 
 def generate_level(level):
@@ -26,7 +29,10 @@ def generate_level(level):
             elif level[y][x] == 'r':
                 Tile('road', x, y)
             elif level[y][x] == '@':
-                Tile('road', x, y)
+                if level[0][0] == 'w':
+                    Tile('floor_4', x, y)
+                else:
+                    Tile('road', x, y)
                 new_player = Player(x, y, all_sprites, player_group)
             elif level[y][x] == '1':
                 PoisonShop(x, y)
@@ -46,6 +52,26 @@ def generate_level(level):
             elif level[y][x] == '6':
                 BigHouse(x, y)
                 Tile('grass', x, y)
+            elif level[y][x] == 't':
+                Trap(x, y, all_sprites, trap_group)
+            elif level[y][x] == 'm':
+                Tile('green_wall', x, y)
+            elif level[y][x] == 'w':
+                Tile('wall', x, y)
+            elif level[y][x] == 'b':
+                Tile('dark', x, y)
+            elif level[y][x] == 'c':
+                # Tile('green_wall', x, y)
+                Tile('coin', x, y)
+            elif level[y][x] == '7':
+                Tile('floor_2', x, y)
+            elif level[y][x] == '8':
+                Tile('floor_3', x, y)
+            elif level[y][x] == '9':
+                Tile('floor_4', x, y)
+            elif level[y][x] == 'e':
+                Goblin(x, y, enemy_group, all_sprites)
+
     return new_player, x, y
 
 
@@ -228,6 +254,65 @@ class CathedralEasy(Building):
         super().__init__("cathedral_1", pos_x, pos_y, groups)
         self.name = 'New cathedral'
 
+    def enter(self, player):
+        global delt_x, delt_y
+        delt_x, delt_y = 0, 0
+        for i in all_sprites:
+            i.kill()
+        player, level_x, level_y = generate_level(load_level('data/levels/lvl_1.dat'))
+        running = True
+        clock = pygame.time.Clock()
+        pos = (0, 0)
+        camera = Camera()
+        camera.update(player)
+        Button(width - 35, 0, 35, 35, load_image("data/other/exit_button.png", colorkey=(0, 0, 255)), test,
+               button_group, buildings_group)
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                if event.type == pygame.MOUSEMOTION:
+                    pos = event.pos
+                    for btn in button_group:
+                        btn.check_selection(pos)
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    pos = event.pos
+                    for btn in button_group:
+                        if btn.rect.collidepoint(pos):
+                            btn.run()
+            data = pygame.key.get_pressed()
+            player.set_moving(False)
+            if data[119]:
+                player.move_point(pos, True)
+                player.set_moving(True)
+            elif data[115]:
+                player.move_point(pos, False)
+                player.set_moving(Tile)
+            elif data[101]:
+                if door:
+                    door.enter(player)
+            for trap in trap_group:
+                if trap.rect.colliderect(player.rect):
+                    player.get_damage(trap.get_damage())
+            screen.fill((0, 0, 0))
+            camera.update(player)
+            for sprite in all_sprites:
+                camera.apply(sprite)
+            all_sprites.update(pos)
+            for enemy in enemy_group:
+                enemy.move_point(player.get_coords())
+            all_sprites.draw(screen)
+            button_group.draw(screen)
+            buildings_group.draw(screen)
+            trap_group.draw(screen)
+            enemy_group.draw(screen)
+            player_group.draw(screen)
+            if text:
+                screen.blit(text, (0, height - 30))
+            screen.blit(render_info(player, screen), (0, 0))
+            pygame.display.flip()
+            clock.tick(fps)
+
 
 class CathedralHard(Building):
     def __init__(self, pos_x, pos_y, *groups):
@@ -247,6 +332,7 @@ class Camera:
         self.dy = 0
 
     def apply(self, obj):
+        global delt_x, delt_y
         obj.rect.x += self.dx
         obj.rect.y += self.dy
         try:
@@ -254,10 +340,108 @@ class Camera:
             obj.col_rect.y += self.dy
         except AttributeError:
             pass
+        delt_x += self.dx
+        delt_y += self.dy
+
+
 
     def update(self, target):
+        prev = (self.dx, self.dy)
         self.dx = -(target.rect.x + target.rect.w // 2 - width // 2)
         self.dy = -(target.rect.y + target.rect.h // 2 - height // 2)
+
+
+
+class Goblin(pygame.sprite.Sprite):
+    step = 1
+
+    def __init__(self, x, y, *groups):
+        super().__init__(groups)
+        self.frames = {'left': [], 'right': [], 'back': [], 'forward': []}
+        # self.cut_sheet(load_image("data/characters/player_right.png", colorkey=(255, 0, 0)), 9, 1)
+        self.frame_num = 0
+        for i in range(5):
+            self.frames["left"].append(load_image(f'data/characters/goblin_left_{str(i + 1)}.png',
+                                                  colorkey=(255, 0, 0), size=(tile_size, tile_size)))
+        for i in range(5):
+            self.frames["right"].append(load_image(f'data/characters/goblin_right_{str(i + 1)}.png',
+                                                   colorkey=(255, 0, 0), size=(tile_size, tile_size)))
+
+        # self.image = self.frames[self.frame_num]
+        self.image = self.frames['right'][self.frame_num]
+        self.rect = self.image.get_rect()
+        self.rect.x = x * tile_size + delt_x
+        self.rect.y = y * tile_size + delt_y
+        self.prev_coords = self.get_coords()
+        self.num = 0
+        self.pos = (self.rect.x + 1, self.rect.y)
+        self.col_rect = pygame.Rect(self.rect.x - building_collide_step, self.rect.y - building_collide_step,
+                                    self.rect.w + building_collide_step, self.rect.h + building_collide_step)
+        self.health = 100
+
+        self.past_game_coords = (y, x)
+        self.reproduce_num = 0
+
+    def get_damage(self, damage):
+        self.health -= damage
+
+    def get_health(self):
+        return self.health
+
+    def get_x(self):
+        return self.rect.x
+
+    def get_y(self):
+        return self.rect.y
+
+    def get_coords(self):
+        return (self.get_x(), self.get_y())
+
+    def move_point(self, pos):
+        x, y = pos
+        self.pos = pos
+        dist = distance(pos, (self.rect.x, self.rect.y))
+        self.prev_coords = self.get_coords()
+        self.rect.x += 0.001 * (Player.step * x - self.rect.x)
+        self.rect.y += 0.001 * (Player.step * y - self.rect.y)
+
+        if check_collisions(self):
+            self.rect.x = self.prev_coords[0]
+            self.rect.y = self.prev_coords[1]
+
+    def reproduce(self):
+        Goblin(*self.past_game_coords, enemy_group, all_sprites)
+
+    def update(self, pos):
+        '''self.pos = pos
+        x, y = pos
+        self.pos = pos
+        dist = distance(pos, (self.rect.x, self.rect.y))
+        self.prev_coords = self.get_coords()
+        self.rect.x += 0.001 * (Player.step * x - self.rect.x)
+        self.rect.y += 0.001 * (Player.step * y - self.rect.y)
+
+        if check_collisions(self):
+            self.rect.x = self.prev_coords[0]
+            self.rect.y = self.prev_coords[1]
+'''
+        x = self.pos[0]
+        self.num += 1
+        self.reproduce_num += 1
+        if self.num == 16:
+            self.frame_num = (self.frame_num + 1) % (len(self.frames['left']) - 2)
+            if x > self.rect.x:
+                self.image = self.frames['right'][self.frame_num]
+            else:
+                self.image = self.frames['left'][self.frame_num]
+            self.num = 1
+        if self.reproduce_num > 60:
+            self.reproduce()
+            self.reproduce_num = 0
+        print(delt_x, delt_y)
+
+    def is_obstacle(self):
+        return False
 
 
 # notice new methods of getting helth, money, rect
@@ -307,6 +491,9 @@ class Player(pygame.sprite.Sprite):
             self.poisons.append(prod)
         return True
 
+    def get_damage(self, damage):
+        self.health -= damage
+
     def reduce_money(self, amount):
         prev = self.money
         self.money -= amount
@@ -349,11 +536,11 @@ class Player(pygame.sprite.Sprite):
         dist = distance(pos, (self.rect.x, self.rect.y))
         self.prev_coords = self.get_coords()
         if forward:
-            self.rect.x += 0.01 * (Player.step * x - self.rect.x)
-            self.rect.y += 0.01 * (Player.step * y - self.rect.y)
+            self.rect.x += 0.1 * (Player.step * x - self.rect.x)
+            self.rect.y += 0.1 * (Player.step * y - self.rect.y)
         elif not forward:
-            self.rect.x -= 0.01 * (Player.step * x - self.rect.x)
-            self.rect.y -= 0.01 * (Player.step * y - self.rect.y)
+            self.rect.x -= 0.1 * (Player.step * x - self.rect.x)
+            self.rect.y -= 0.1 * (Player.step * y - self.rect.y)
 
         if check_collisions(self):
             self.rect.x = self.prev_coords[0]
@@ -366,7 +553,7 @@ class Player(pygame.sprite.Sprite):
         self.pos = pos
         x = self.pos[0]
         self.num += 1
-        if self.num == 10:
+        if self.num == 8:
             self.frame_num = (self.frame_num + 1) % len(self.frames['left'])
             if self.moving:
                 if x > self.rect.x:
@@ -379,6 +566,9 @@ class Player(pygame.sprite.Sprite):
                 else:
                     self.image = self.frames['left'][0]
             self.num = 1
+
+    def is_obstacle(self):
+        return False
 
 
 class Tile(pygame.sprite.Sprite):
@@ -395,9 +585,31 @@ class Tile(pygame.sprite.Sprite):
                                     self.rect.w + building_collide_step, self.rect.h + building_collide_step)
 
     def is_obstacle(self):
-        if self.type in ['road', 'grass', "roof"]:
+        if self.type in ['road', 'grass', 'roof', 'floor_4', 'floor_3', 'floor_2', 'coin']:
             return False
         return True
+
+
+class Trap(pygame.sprite.Sprite):
+    def __init__(self, pos_x, pos_y, *groups):
+        super().__init__(groups)
+        self.image = tile_images['green_wall']
+        self.image.blit(tile_images['trap'], (0, 0))
+        self.rect = self.image.get_rect()
+        self.rect.x, self.rect.y = pos_x * tile_size, pos_y * tile_size
+        self.damage = 2
+        self.tick_num = 0
+        self.damage_each = 10
+
+    def get_damage(self):
+        self.tick_num += 1
+        if self.tick_num > self.damage_each:
+            self.tick_num = 0
+            return self.damage
+        return 0
+
+    def is_obstacle(self):
+        return False
 
 
 class Button(pygame.sprite.Sprite):
@@ -512,12 +724,21 @@ tile_images = {"road": load_image("data/textures/stone_1.png", (255, 0, 0), (til
                "cathedral_1": load_image("data/houses/cathedral_1.png", (255, 0, 0), (tile_size * 5, tile_size * 2)),
                "cathedral_2": load_image("data/houses/cathedral_2.png", (255, 0, 0), (tile_size * 3, tile_size * 2)),
                "big_house": load_image("data/houses/big_house.png", (255, 0, 0), (tile_size * 2, tile_size * 2)),
-               "empty": load_image("data/other/empty.png", (255, 0, 0), (tile_size * 2, tile_size * 2))}
+               "empty": load_image("data/other/empty.png", (255, 0, 0), (tile_size * 2, tile_size * 2)),
+               "coin": load_image("data/textures/coin.png", (255, 0, 0), (tile_size, tile_size)),
+               "floor_4": load_image("data/textures/floor_4.png", (255, 0, 0), (tile_size, tile_size)),
+               "floor_3": load_image("data/textures/floor_3.png", (255, 0, 0), (tile_size, tile_size)),
+               "floor_2": load_image("data/textures/floor_2.png", (255, 0, 0), (tile_size, tile_size)),
+               "wall": load_image("data/textures/wall.png", (255, 0, 0), (tile_size, tile_size)),
+               "green_wall": load_image("data/textures/green_wall.png", (255, 0, 0), (tile_size, tile_size)),
+               "dark": load_image("data/textures/eye.png", (255, 0, 0), (tile_size, tile_size)),
+               "trap": load_image("data/textures/trap.png", (255, 0, 0), (tile_size, tile_size))
+               }
 tile_images['road'].set_alpha(150)
 player, level_x, level_y = generate_level(load_level('data/levels/city.dat'))
 fps = 60
-a = PoisonShop(0, 0)
-a.enter(player)
+'''a = PoisonShop(0, 0)
+a.enter(player)'''
 running = True
 clock = pygame.time.Clock()
 pos = (0, 0)
