@@ -3,7 +3,7 @@ import pygame
 pygame.init()
 size = width, height = 1100, 700
 screen = pygame.display.set_mode(size)  # , pygame.FULLSCREEN)
-tile_size = 200
+tile_size = 125
 building_collide_step = 75
 all_sprites = pygame.sprite.Group()
 player_group = pygame.sprite.Group()
@@ -287,10 +287,20 @@ class CathedralEasy(Building):
             data = pygame.key.get_pressed()
             player.set_moving(False)
             if data[119]:
-                player.move_point(pos, True)
+                player.move_up()
+                # player.move_point(pos, True)
                 player.set_moving(True)
-            elif data[115]:
-                player.move_point(pos, False)
+            if data[115]:
+                player.move_down()
+                # player.move_point(pos, False)
+                player.set_moving(Tile)
+            if data[97]:
+                player.move_left()
+                # player.move_point(pos, False)
+                player.set_moving(Tile)
+            if data[100]:
+                player.move_right()
+                # player.move_point(pos, False)
                 player.set_moving(Tile)
             elif data[101]:
                 if door:
@@ -353,7 +363,7 @@ class Camera:
 
 
 class Goblin(pygame.sprite.Sprite):
-    step = 1
+    speed = 1
 
     def __init__(self, x, y, *groups):
         super().__init__(groups)
@@ -400,13 +410,16 @@ class Goblin(pygame.sprite.Sprite):
     def get_coords(self):
         return (self.get_x(), self.get_y())
 
+    def set_health(self, health):
+        self.health = health
+
     def move_point(self, pos):
         x, y = pos
         self.pos = pos
         dist = distance(pos, (self.rect.x, self.rect.y))
         self.prev_coords = self.get_coords()
-        self.rect.x += 0.01 * (Player.step * x - self.rect.x)
-        self.rect.y += 0.01 * (Player.step * y - self.rect.y)
+        self.rect.x += 0.01 * (Goblin.speed * x - self.rect.x)
+        self.rect.y += 0.01 * (Goblin.speed * y - self.rect.y)
 
         if check_collisions(self):
             self.rect.x = self.prev_coords[0]
@@ -421,8 +434,8 @@ class Goblin(pygame.sprite.Sprite):
         self.pos = pos
         dist = distance(pos, (self.rect.x, self.rect.y))
         self.prev_coords = self.get_coords()
-        self.rect.x += 0.001 * (Player.step * x - self.rect.x)
-        self.rect.y += 0.001 * (Player.step * y - self.rect.y)
+        self.rect.x += 0.001 * (Player.speed * x - self.rect.x)
+        self.rect.y += 0.001 * (Player.speed * y - self.rect.y)
 
         if check_collisions(self):
             self.rect.x = self.prev_coords[0]
@@ -457,7 +470,7 @@ class Goblin(pygame.sprite.Sprite):
 # notice new methods of getting helth, money, rect
 # notice new attributes (money, health)
 class Player(pygame.sprite.Sprite):
-    step = 1
+    speed = 10
 
     def __init__(self, x, y, *groups):
         super().__init__(groups)
@@ -513,6 +526,50 @@ class Player(pygame.sprite.Sprite):
             self.poisons.append(prod)
         return True
 
+    def move_left(self):
+        x, y = pos
+        self.pos = pos
+        dist = distance(pos, (self.rect.x, self.rect.y))
+        self.prev_coords = self.get_coords()
+        self.rect.x -= Player.speed
+
+        if check_collisions(self):
+            self.rect.x = self.prev_coords[0]
+            self.rect.y = self.prev_coords[1]
+
+    def move_right(self):
+        x, y = pos
+        self.pos = pos
+        dist = distance(pos, (self.rect.x, self.rect.y))
+        self.prev_coords = self.get_coords()
+        self.rect.x += Player.speed
+
+        if check_collisions(self):
+            self.rect.x = self.prev_coords[0]
+            self.rect.y = self.prev_coords[1]
+
+    def move_up(self):
+        x, y = pos
+        self.pos = pos
+        dist = distance(pos, (self.rect.x, self.rect.y))
+        self.prev_coords = self.get_coords()
+        self.rect.y -= Player.speed
+
+        if check_collisions(self):
+            self.rect.x = self.prev_coords[0]
+            self.rect.y = self.prev_coords[1]
+
+    def move_down(self):
+        x, y = pos
+        self.pos = pos
+        dist = distance(pos, (self.rect.x, self.rect.y))
+        self.prev_coords = self.get_coords()
+        self.rect.y += Player.speed
+
+        if check_collisions(self):
+            self.rect.x = self.prev_coords[0]
+            self.rect.y = self.prev_coords[1]
+
     def get_damage(self, damage):
         self.health -= damage
 
@@ -558,11 +615,11 @@ class Player(pygame.sprite.Sprite):
         dist = distance(pos, (self.rect.x, self.rect.y))
         self.prev_coords = self.get_coords()
         if forward:
-            self.rect.x += 0.01 * (Player.step * x - self.rect.x)
-            self.rect.y += 0.01 * (Player.step * y - self.rect.y)
+            self.rect.x += 0.01 * (Player.speed * x - self.rect.x)
+            self.rect.y += 0.01 * (Player.speed * y - self.rect.y)
         elif not forward:
-            self.rect.x -= 0.01 * (Player.step * x - self.rect.x)
-            self.rect.y -= 0.01 * (Player.step * y - self.rect.y)
+            self.rect.x -= 0.01 * (Player.speed * x - self.rect.x)
+            self.rect.y -= 0.01 * (Player.speed * y - self.rect.y)
 
         if check_collisions(self):
             self.rect.x = self.prev_coords[0]
@@ -743,6 +800,7 @@ def render_text(line):
     text = font.render(line, 1, (255, 255, 255))
     return text
 
+
 # nothing, but it works)
 def test():
     quit()
@@ -796,12 +854,23 @@ while running:
     data = pygame.key.get_pressed()
     player.set_moving(False)
     if data[119]:
-        player.move_point(pos, True)
+        player.move_up()
+        # player.move_point(pos, True)
         player.set_moving(True)
-    elif data[115]:
-        player.move_point(pos, False)
+    if data[115]:
+        player.move_down()
+        # player.move_point(pos, False)
         player.set_moving(Tile)
-    elif data[101]:
+    if data[97]:
+        player.move_left()
+        # player.move_point(pos, False)
+        player.set_moving(Tile)
+    if data[100]:
+        player.move_right()
+        # player.move_point(pos, False)
+        player.set_moving(Tile)
+
+    if data[101]:
         if door:
             door.enter(player)
     screen.fill((0, 0, 0))
