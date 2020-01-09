@@ -755,6 +755,7 @@ class Weapon(Item):
                 def function(self, *args, **kwargs):
                     func(self, *args, **kwargs)
                     self.kill()
+            self.do_damage = decorator(self.do_damage)
 
         elif title == 'r':  # AK-47 
             self.firerate = 50
@@ -771,11 +772,9 @@ class Weapon(Item):
         else:
             raise ValueError('There is not weapon with this title.')
 
-        self.decorator = decorator
         self.text = name + ' (%s урона)' % damage
         self.change_image(cut_sheet(load_image(r'data\weapons\data.png'), 13, 11, number))
 
-    @self.decorator
     def do_damage(self, pos):
         self.timer += self.clock.tick()
         if self.timer >= self.firerate:
