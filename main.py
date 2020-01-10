@@ -8,6 +8,7 @@ tile_size = 200
 building_collide_step = 75
 all_sprites = pygame.sprite.Group()
 player_group = pygame.sprite.Group()
+potionshop_group = pygame.sprite.Group()
 tile_group = pygame.sprite.Group()
 buildings_group = pygame.sprite.Group()
 button_group = pygame.sprite.Group()
@@ -202,7 +203,7 @@ class PotionShop(Building):
                None, buttons)
         for i in range(5):
             for j in range(5):
-                heal = Potion('h+1', 200, all_sprites)
+                heal = Potion(f's+{i + j}', 200, potionshop_group)
                 Product(100 + i * 50, 100 + j * 50, 50, 50, heal, products)
         while running:
             for event in pygame.event.get():
@@ -239,6 +240,7 @@ class PotionShop(Building):
         # deleting all buttons
         for btn in buttons:
             shop_interface_end(btn)
+        potionshop_group.empty()
 
 
 class LivingHouse(Building):
@@ -674,7 +676,6 @@ class Button(pygame.sprite.Sprite):
 
 class Item(pygame.sprite.Sprite):
     def change_image(self, image, image_size=200):
-        self._img = image
         self.image = pygame.Surface((image_size,) * 2)
         self.rect = self.image.get_rect()
         image = resize_image(image, int(image_size * 0.6))
@@ -747,7 +748,8 @@ class Potion(Item):
         else:
             raise ValueError('Effect must be "h"eal, "s"peed or "d"amage, with +"int" or without')
         self.name = self.text
-        self.change_image(image)
+        self._img = image
+        # self.change_image(image)
 
     def do_effect(self, player):
         if self.effect == 'h':
