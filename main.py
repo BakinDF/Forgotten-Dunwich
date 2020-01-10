@@ -1,4 +1,5 @@
 import pygame
+from abc import abstractmethod, ABC
 
 pygame.init()
 size = width, height = 1100, 700
@@ -37,7 +38,7 @@ def generate_level(level):
                     Tile('road', x, y)
                 new_player = Player(x, y, all_sprites, player_group)
             elif level[y][x] == '1':
-                PoisonShop(x, y)
+                PotionShop(x, y)
                 Tile('grass', x, y)
             elif level[y][x] == '2':
                 CathedralEasy(x, y)
@@ -124,17 +125,16 @@ class Product(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y, w, h, prod, *groups):
         super().__init__(groups)
         # prod - object we can buy
-        '''self.image = pygame.transform.scale(prod.get_image(), (w, h))
+        self.image = pygame.transform.scale(prod.get_image(), (w, h))
         self.disc = prod.get_disc()
         self.price = prod.get_price()
-        self.name = prod.get_name'''
+        self.name = prod.get_name()
         # example
-        self.prod = prod
+        """self.prod = prod
         self.disc = '123\n456\n\n789'
         self.price = 456
-        self.name = 'the first product'
-
-        self.image = pygame.transform.scale(tile_images["empty"], (w, h))
+        self.name = 'the first product
+        self.image = pygame.transform.scale(tile_images["empty"], (w, h))"""
         self.rect = self.image.get_rect()
         self.rect.x, self.rect.y, self.rect.w, self.rect.h = pos_x, pos_y, w, h
 
@@ -177,7 +177,7 @@ class Product(pygame.sprite.Sprite):
         return info_sprite
 
 
-class PoisonShop(Building):
+class PotionShop(Building):
     def __init__(self, pos_x, pos_y, *groups):
         super().__init__("poison_shop", pos_x, pos_y, groups)
         self.name = 'Poison shop'
@@ -202,7 +202,8 @@ class PoisonShop(Building):
                None, buttons)
         for i in range(5):
             for j in range(5):
-                Product(100 + i * 50, 100 + j * 50, 50, 50, None, products)
+                heal = Potion('h+1', 200, all_sprites)
+                Product(100 + i * 50, 100 + j * 50, 50, 50, heal, products)
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -509,7 +510,7 @@ class Player(pygame.sprite.Sprite):
     def add_product(self, prod):
         if isinstance(prod, Weapon):
             self.weapons.append(prod)
-        elif isinstance(prod, Poison):
+        elif isinstance(prod, Potion):
             self.poisons.append(prod)
         return True
 
@@ -673,6 +674,7 @@ class Button(pygame.sprite.Sprite):
 
 class Item(pygame.sprite.Sprite):
     def change_image(self, image, image_size=200):
+        self._img = image
         self.image = pygame.Surface((image_size,) * 2)
         self.rect = self.image.get_rect()
         image = resize_image(image, int(image_size * 0.6))
@@ -682,11 +684,14 @@ class Item(pygame.sprite.Sprite):
 
         size = 1
         font = pygame.font.Font(None, size)
-        label = font.render(self.text, 1, (0, 255, 0))
-        while label.get_rect().w <= image_size:
+        text_label = font.render(self.text, 1, (0, 255, 0))
+        price_label = font.render(str(self.price), 1, (0, 255, 0))
+
+        while text_label.get_rect().w <= image_size and price_label.get_rect().h <= image_size * 0.18 and price_label.get_rect().w <= image_size and text_label.get_rect().h <= image_size * 0.18:
             size += 1
             font = pygame.font.Font(None, size)
-            label = font.render(self.text, 1, (0, 255, 0))
+            text_label = font.render(self.text, 1, (0, 255, 0))
+            price_label = font.render(str(self.price), 1, (0, 255, 0))
 
         font = pygame.font.Font(None, size - 1)
         text_label = font.render(self.text, 1, (0, 255, 0))
@@ -695,13 +700,24 @@ class Item(pygame.sprite.Sprite):
         price_label = font.render(str(self.price), 1, (0, 255, 0))
         self.image.blit(price_label, (int((image_size - price_label.get_rect().w) / 2), int(image_size * 0.8) + 6))
 
+    def get_image(self):
+        return self._img
+
+    def get_name(self):
+        return self.name
+
+    def get_disc(self):
+        return self.disc
+
+    def get_price(self):
+        return self.price
+
 
 class Potion(Item):
     # Базовые усиления
     heal = 25
     speed = 2
     damage = 1
-
 
     def __init__(self, title, price, *groups):
         super().__init__(groups)
@@ -716,25 +732,27 @@ class Potion(Item):
         if self.effect == 'h':
             image = load_image(r'data\potions\healing_potion.png', -1)
             self.text = 'Зелье Лечения' + (f' +{self.coof}' if self.coof > 1 else '')
+            self.disc = f'Лечит на {int(self.heal * (self.coof / 2 + 1))} HP'
         elif self.effect == 's':
             image = load_image(r'data\potions\speed_potion.png', -1)
             self.text = 'Зелье Скорости' + (f' +{self.coof}' if self.coof > 1 else '')
+            self.disc = f'Ускоряет персонажа в {int(self.speed * (self.coof / 2 + 1))} раз'
         elif self.effect == 'd':
             image = load_image(r'data\potions\damage_potion.png', -1)
             self.text = 'Зелье Урона' + (f' +{self.coof}' if self.coof > 1 else '')
+            self.disc = f'Увеличивает урон персонажа в {int(self.damage + (self.coof / 10 + 1))} раз'
         else:
             raise ValueError('Effect must be "h"eal, "s"peed or "d"amage, with +"int" or without')
-
+        self.name = self.text
         self.change_image(image)
-
 
     def do_effect(self, player):
         if self.effect == 'h':
-            player.set_health(player.get_health() + int(self.heal * self.coof / 2))
+            player.set_health(player.get_health() + int(self.heal * (self.coof / 2 + 1)))
         elif self.effect == 's':
-            player.set_speed(player.get_speed() + int(self.speed * self.coof / 2))
+            player.set_speed(player.get_speed() + int(self.speed * (self.coof / 2 + 1)))
         elif self.effect == 'd':
-            player.set_damage_boost(player.get_damage_boost() + int(self.damage + self.coof / 10))
+            player.set_damage_boost(player.get_damage_boost() + int(self.damage + (self.coof / 10 + 1)))
         self.kill()
 
 
@@ -745,40 +763,50 @@ class Weapon(Item):
         self.price = price
         self.clock = pygame.time.Clock()
         self.timer = 0
+
         def decorator(func):
             return func
 
         if title == 'g':  # Граната
             self.firerate = 0
-            self.change_image(r'data\weapons\grenade.png')
+            self.name = 'Граната'
+            self.text = self.name
+            self.change_image(load_image(r'data\weapons\grenade.png'))
+
             def decorator(func):
                 def function(self, *args, **kwargs):
                     func(self, *args, **kwargs)
                     self.kill()
+
             self.do_damage = decorator(self.do_damage)
 
-        elif title == 'r':  # AK-47 
+        elif title == 'r':  # AK-47
+            self.name = 'АК-47'
+            self.text = self.name
             self.firerate = 50
-            self.change_image(r'data\weapons\rifle.png')
-        elif title == 'sr':  # Снайперская винтовка  
+            self.change_image(load_image(r'data\weapons\rifle.png'))
+        elif title == 'sr':  # Снайперская винтовка
+            self.name = 'Снайперская винтовка'
+            self.text = self.name
             self.firerate = 5000
-            self.change_image(r'data\weapons\sniper_rifle.png')
+            self.change_image(load_image(r'data\weapons\sniper_rifle.png'))
         elif title == 'k':  # Нож
+            self.name = 'Нож'
+            self.text = self.name
             self.firerate = 1000
-            self.change_image(r'data\weapons\knife.png')
+            self.change_image(load_image(r'data\weapons\knife.png'))
         elif title == 'p':  # Пистолет
+            self.name = 'Пистолет'
+            self.text = self.name
             self.firerate = 500
-            self.change_image(r'data\weapons\pistol.png')
+            self.change_image(load_image(r'data\weapons\pistol.png'))
         else:
             raise ValueError('There is not weapon with this title.')
-
-        self.text = name + ' (%s урона)' % damage
-        self.change_image(cut_sheet(load_image(r'data\weapons\data.png'), 13, 11, number))
 
     def do_damage(self, pos):
         self.timer += self.clock.tick()
         if self.timer >= self.firerate:
-            self.timer -= self.firerate
+            self.timer = 0
             for sprite in enemies:  # Группа спрайтов с врагами
                 if sprite.rect.collidepoint(pos):
                     sprite.get_damage(self.damage)  # У врагов должна быть функция get_damage(damage)
@@ -786,7 +814,7 @@ class Weapon(Item):
 
 def cut_sheet(sheet, columns, rows, number=0):
     rect = pygame.Rect(0, 0, sheet.get_width() // columns,
-                            sheet.get_height() // rows)
+                       sheet.get_height() // rows)
     frames = []
     for j in range(rows):
         for i in range(columns):
@@ -801,7 +829,7 @@ def cut_sheet(sheet, columns, rows, number=0):
 def resize_image(image, biggest_side):
     x, y = image.get_rect().w, image.get_rect().h
     prop = biggest_side / max((x, y))
-    return pygame.transform.scale(int(x * prop), int(y * prop))
+    return pygame.transform.scale(image, (int(x * prop), int(y * prop)))
 
 
 def distance(coords_1, coords_2):
@@ -876,6 +904,7 @@ def render_text(line):
     text = font.render(line, 1, (255, 255, 255))
     return text
 
+
 # nothing, but it works)
 def test():
     quit()
@@ -904,7 +933,7 @@ tile_images = {"road": load_image("data/textures/stone_1.png", (255, 0, 0), (til
 tile_images['road'].set_alpha(150)
 player, level_x, level_y = generate_level(load_level('data/levels/city.dat'))
 fps = 60
-'''a = PoisonShop(0, 0)
+'''a = PotionShop(0, 0)
 a.enter(player)'''
 running = True
 clock = pygame.time.Clock()

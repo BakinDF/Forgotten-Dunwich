@@ -19,11 +19,14 @@ class Item(pygame.sprite.Sprite):
 
         size = 1
         font = pygame.font.Font(None, size)
-        label = font.render(self.text, 1, (0, 255, 0))
-        while label.get_rect().w <= image_size:
+        text_label = font.render(self.text, 1, (0, 255, 0))
+        price_label = font.render(str(self.price), 1, (0, 255, 0))
+
+        while text_label.get_rect().w <= image_size and price_label.get_rect().h <= image_size * 0.18 and price_label.get_rect().w <= image_size and text_label.get_rect().h <= image_size * 0.18:
             size += 1
             font = pygame.font.Font(None, size)
-            label = font.render(self.text, 1, (0, 255, 0))
+            text_label = font.render(self.text, 1, (0, 255, 0))
+            price_label = font.render(str(self.price), 1, (0, 255, 0))
 
         font = pygame.font.Font(None, size - 1)
         text_label = font.render(self.text, 1, (0, 255, 0))
@@ -87,36 +90,44 @@ class Weapon(Item):
 
         if title == 'g':  # Граната
             self.firerate = 0
-            self.change_image(r'data\weapons\grenade.png')
+            self.name = 'Граната'
+            self.text = self.name
+            self.change_image(load_image(r'data\weapons\grenade.png'))
             def decorator(func):
                 def function(self, *args, **kwargs):
                     func(self, *args, **kwargs)
                     self.kill()
 
-        elif title == 'r':  # AK-47 
+            self.do_damage = decorator(self.do_damage)
+
+        elif title == 'r':  # AK-47
+            self.name = 'АК-47'
+            self.text = self.name
             self.firerate = 50
-            self.change_image(r'data\weapons\rifle.png')
-        elif title == 'sr':  # Снайперская винтовка  
+            self.change_image(load_image(r'data\weapons\rifle.png'))
+        elif title == 'sr':  # Снайперская винтовка
+            self.name = 'Снайперская винтовка'
+            self.text = self.name
             self.firerate = 5000
-            self.change_image(r'data\weapons\sniper_rifle.png')
+            self.change_image(load_image(r'data\weapons\sniper_rifle.png'))
         elif title == 'k':  # Нож
+            self.name = 'Нож'
+            self.text = self.name
             self.firerate = 1000
-            self.change_image(r'data\weapons\knife.png')
+            self.change_image(load_image(r'data\weapons\knife.png'))
         elif title == 'p':  # Пистолет
+            self.name = 'Пистолет'
+            self.text = self.name
             self.firerate = 500
-            self.change_image(r'data\weapons\pistol.png')
+            self.change_image(load_image(r'data\weapons\pistol.png'))
         else:
             raise ValueError('There is not weapon with this title.')
 
-        self.decorator = decorator
-        self.text = name + ' (%s урона)' % damage
-        self.change_image(cut_sheet(load_image(r'data\weapons\data.png'), 13, 11, number))
 
-    @self.decorator
     def do_damage(self, pos):
         self.timer += self.clock.tick()
         if self.timer >= self.firerate:
-            self.timer -= self.firerate
+            self.timer = 0
             for sprite in enemies:  # Группа спрайтов с врагами
                 if sprite.rect.collidepoint(pos):
                     sprite.get_damage(self.damage)  # У врагов должна быть функция get_damage(damage)
@@ -157,7 +168,7 @@ def cut_sheet(sheet, columns, rows, number=0):
 pygame.init()
 screen = pygame.display.set_mode((200, 200))
 all_sprites = pygame.sprite.Group()
-potion = Weapon('Hehe', 200, 200, 45, all_sprites)
+potion = Weapon('g', 200, 200, 45, all_sprites)
 potion.rect = potion.rect.move((0, 0))
 all_sprites.draw(screen)
 pygame.display.flip()
