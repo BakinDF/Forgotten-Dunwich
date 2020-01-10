@@ -20,7 +20,7 @@ delt = None
 # money, health
 player_params = []
 small_eps = 5
-eps = 20
+eps = 30
 
 
 def generate_level(level):
@@ -78,7 +78,6 @@ def generate_level(level):
             elif level[y][x] == 'e':
                 if not was_goblin:
                     Goblin(x + 1, y + 1, enemy_group, all_sprites)
-                    print(x, y)
                     #quit()
                     was_goblin = True
                 Tile('green_wall_2', x, y)
@@ -375,7 +374,7 @@ class Camera:
 
 class Goblin(pygame.sprite.Sprite):
     speed = 1
-    size_decrease = 10
+    size_decrease = 30
 
     def __init__(self, x, y, *groups):
         super().__init__(groups)
@@ -405,6 +404,9 @@ class Goblin(pygame.sprite.Sprite):
         self.hit_mode = False
         self.hit_counter = 0
 
+        self.target = None
+
+
     def get_damage(self):
         if self.hit_mode:
             return 0
@@ -426,22 +428,31 @@ class Goblin(pygame.sprite.Sprite):
         self.health = health
 
     def move_point(self, pos):
-        self.way = find_path('data/levels/lvl_1.dat', *get_cell(*self.get_coords()), *get_cell(*player.get_coords()))
-        print(*get_cell(*self.get_coords()), *get_cell(*player.get_coords()))
-        print(self.way)
-        if self.way:
-            x, y = self.way[0]
+        if not self.target:
+            way = find_path('data/levels/lvl_1.dat', *get_cell(*self.get_coords()), *get_cell(*player.get_coords()))
+            if way:
+                self.target = [way[0][0], 28 - way[0][1]]
+                print(way)
+            else:
+                return
         else:
-            return
-        self.pos = pos
-        dist = distance(pos, (self.rect.x, self.rect.y))
-        self.prev_coords = self.get_coords()
-        self.rect.x += 0.01 * (Goblin.speed * x - self.rect.x)
-        self.rect.y += 0.01 * (Goblin.speed * y - self.rect.y)
+            coords_goblin = (self.get_x() - delt[0], self.get_y() - delt[1])
+            coords_target = (self.target[0] * tile_size, self.target[1] * tile_size)[::-1]
+            dist = distance(coords_goblin, coords_target)
+            if dist < eps:
+                self.target = None
+                return
+        if self.target:
+            print(self.target)
+            x, y = (self.target[0] * tile_size + delt[0], self.target[1] * tile_size + delt[0])[::-1]
+            print(self.get_coords(), (x, y))
+            self.prev_coords = self.get_coords()
+            self.rect.x += 0.01 * (Goblin.speed * x - self.rect.x)
+            self.rect.y += 0.01 * (Goblin.speed * y - self.rect.y)
 
-        if check_collisions(self):
-            self.rect.x = self.prev_coords[0]
-            self.rect.y = self.prev_coords[1]
+            if check_collisions(self):
+                self.rect.x = self.prev_coords[0]
+                self.rect.y = self.prev_coords[1]
 
     def hit(self):
         self.hit_mode = True
@@ -496,8 +507,12 @@ class Player(pygame.sprite.Sprite):
         # self.cut_sheet(load_image("data/characters/player_right.png", colorkey=(255, 0, 0)), 9, 1)
         self.frame_num = 0
         for i in range(9):
-            self.frames["left"].append(load_image(f'data/characters/player_left_{str(i + 1)}.png',
-                                                  colorkey=(255, 0, 0)))
+            if i == 0:
+                self.frames["left"].append(load_image(f'data/characters/player_left_{str(i + 1)}.png',
+                                                      colorkey=(237, 28, 36)))
+            else:
+                self.frames["left"].append(load_image(f'data/characters/player_left_{str(i + 1)}.png',
+                                                      colorkey=(255, 0, 0)))
         for i in range(9):
             self.frames["right"].append(load_image(f'data/characters/player_right_{str(i + 1)}.png',
                                                    colorkey=(255, 0, 0)))
@@ -894,7 +909,7 @@ def render_text(line):
 
 def get_cell(x, y):
     pos = ((x - delt[0]) // tile_size, (y - delt[1]) // tile_size)
-    return pos
+    return pos[::-1]
 
 
 def get_cell_coords(w, h):
@@ -988,4 +1003,3 @@ while running:
     screen.blit(render_info(player, screen), (0, 0))
     pygame.display.flip()
     clock.tick(fps)
-    print(get_cell(*player.get_coords()))
