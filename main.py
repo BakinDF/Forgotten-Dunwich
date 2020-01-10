@@ -712,6 +712,9 @@ class Item(pygame.sprite.Sprite):
     def get_price(self):
         return self.price
 
+    def is_obstacle(self):
+        return True
+
 
 class Potion(Item):
     # Базовые усиления
@@ -732,15 +735,15 @@ class Potion(Item):
         if self.effect == 'h':
             image = load_image(r'data\potions\healing_potion.png', -1)
             self.text = 'Зелье Лечения' + (f' +{self.coof - 1}' if self.coof > 1 else '')
-            self.disc = f'Лечит на {int(self.heal * (self.coof / 2 + 1))} HP'
+            self.disc = f'Лечит на {int(self.heal * ((self.coof + 1) / 2))} HP'
         elif self.effect == 's':
             image = load_image(r'data\potions\speed_potion.png', -1)
             self.text = 'Зелье Скорости' + (f' +{self.coof - 1}' if self.coof > 1 else '')
-            self.disc = f'Ускоряет персонажа в {int(self.speed * (self.coof / 2 + 1))} раз'
+            self.disc = f'Ускоряет персонажа в {int(self.speed * ((self.coof + 1) / 2))} раз'
         elif self.effect == 'd':
             image = load_image(r'data\potions\damage_potion.png', -1)
             self.text = 'Зелье Урона' + (f' +{self.coof - 1}' if self.coof > 1 else '')
-            self.disc = f'Увеличивает урон персонажа в {int(self.damage + (self.coof / 10 + 1))} раз'
+            self.disc = f'Увеличивает урон персонажа в {int(self.damage + ((self.coof + 9) / 10))} раз'
         else:
             raise ValueError('Effect must be "h"eal, "s"peed or "d"amage, with +"int" or without')
         self.name = self.text
@@ -748,11 +751,11 @@ class Potion(Item):
 
     def do_effect(self, player):
         if self.effect == 'h':
-            player.set_health(player.get_health() + int(self.heal * (self.coof / 2 + 1)))
+            player.set_health(player.get_health() + int(self.heal * ((self.coof + 1) / 2)))
         elif self.effect == 's':
             player.set_speed(player.get_speed() + int(self.speed * (self.coof / 2 + 1)))
         elif self.effect == 'd':
-            player.set_damage_boost(player.get_damage_boost() + int(self.damage + (self.coof / 10 + 1)))
+            player.set_damage_boost(player.get_damage_boost() + int(self.damage + ((self.coof + 9) / 10)))
         self.kill()
 
 
