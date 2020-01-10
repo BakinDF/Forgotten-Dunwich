@@ -23,6 +23,7 @@ player_params = []
 
 def generate_level(level):
     new_player, x, y = None, None, None
+    was_goblin = False
     for y in range(len(level)):
         for x in range(len(level[y])):
             if level[y][x] == 'f':
@@ -73,7 +74,11 @@ def generate_level(level):
             elif level[y][x] == '9':
                 Tile('floor_4', x, y)
             elif level[y][x] == 'e':
-                Goblin(x, y, enemy_group, all_sprites)
+                if not was_goblin:
+                    Goblin(x + 1, y + 1, enemy_group, all_sprites)
+                    print(x, y)
+                    #quit()
+                    was_goblin = True
                 Tile('green_wall_2', x, y)
 
     return new_player, x, y
@@ -368,6 +373,7 @@ class Camera:
 
 class Goblin(pygame.sprite.Sprite):
     speed = 1
+    size_decrease = 10
 
     def __init__(self, x, y, *groups):
         super().__init__(groups)
@@ -376,10 +382,10 @@ class Goblin(pygame.sprite.Sprite):
         self.frame_num = 0
         for i in range(5):
             self.frames["left"].append(load_image(f'data/characters/goblin_left_{str(i + 1)}.png',
-                                                  colorkey=(255, 0, 0), size=(tile_size, tile_size)))
+                                                  colorkey=(255, 0, 0), size=(tile_size - Goblin.size_decrease, tile_size - Goblin.size_decrease)))
         for i in range(5):
             self.frames["right"].append(load_image(f'data/characters/goblin_right_{str(i + 1)}.png',
-                                                   colorkey=(255, 0, 0), size=(tile_size, tile_size)))
+                                                   colorkey=(255, 0, 0), size=(tile_size - Goblin.size_decrease, tile_size - Goblin.size_decrease)))
 
         # self.image = self.frames[self.frame_num]
         self.image = self.frames['right'][self.frame_num]
@@ -418,7 +424,13 @@ class Goblin(pygame.sprite.Sprite):
         self.health = health
 
     def move_point(self, pos):
-        x, y = pos
+        self.way = find_path('data/levels/lvl_1.dat', *get_cell(*self.get_coords()), *get_cell(*player.get_coords()))
+        print(*get_cell(*self.get_coords()), *get_cell(*player.get_coords()))
+        print(self.way)
+        if self.way:
+            x, y = self.way[0]
+        else:
+            return
         self.pos = pos
         dist = distance(pos, (self.rect.x, self.rect.y))
         self.prev_coords = self.get_coords()
@@ -474,7 +486,7 @@ class Goblin(pygame.sprite.Sprite):
 # notice new methods of getting helth, money, rect
 # notice new attributes (money, health)
 class Player(pygame.sprite.Sprite):
-    speed = 10
+    speed = 20
 
     def __init__(self, x, y, *groups):
         super().__init__(groups)
@@ -793,13 +805,14 @@ def find_path(path, x1, y1, x2, y2):
                 data[i][j] = -1
             else:
                 data[i][j] = 0
-    # a = [print(i) for i in data]
     lest = deepcopy(data)
-    lest[x1][y1] = 1
-    lest[x2][y2] = 0
+    height = len(lest)
+    width = len(lest[0])
+    if x1 < height and y1 < width:
+        lest[x1][y1] = 1
+    if x1 < height and y1 < width:
+        lest[x2][y2] = 0
     wave = True
-    height = len(data)
-    width = len(data[0])
     while wave and lest[x2][y2] == 0:
         wave = False
         for i in range(height - 1):
@@ -973,4 +986,4 @@ while running:
     screen.blit(render_info(player, screen), (0, 0))
     pygame.display.flip()
     clock.tick(fps)
-    #print(get_cell_coords(*get_cell(*player.get_coords())))
+    print(get_cell(*player.get_coords()))
