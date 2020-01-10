@@ -731,15 +731,15 @@ class Potion(Item):
         self.price = price
         if self.effect == 'h':
             image = load_image(r'data\potions\healing_potion.png', -1)
-            self.text = 'Зелье Лечения' + (f' +{self.coof}' if self.coof > 1 else '')
+            self.text = 'Зелье Лечения' + (f' +{self.coof - 1}' if self.coof > 1 else '')
             self.disc = f'Лечит на {int(self.heal * (self.coof / 2 + 1))} HP'
         elif self.effect == 's':
             image = load_image(r'data\potions\speed_potion.png', -1)
-            self.text = 'Зелье Скорости' + (f' +{self.coof}' if self.coof > 1 else '')
+            self.text = 'Зелье Скорости' + (f' +{self.coof - 1}' if self.coof > 1 else '')
             self.disc = f'Ускоряет персонажа в {int(self.speed * (self.coof / 2 + 1))} раз'
         elif self.effect == 'd':
             image = load_image(r'data\potions\damage_potion.png', -1)
-            self.text = 'Зелье Урона' + (f' +{self.coof}' if self.coof > 1 else '')
+            self.text = 'Зелье Урона' + (f' +{self.coof - 1}' if self.coof > 1 else '')
             self.disc = f'Увеличивает урон персонажа в {int(self.damage + (self.coof / 10 + 1))} раз'
         else:
             raise ValueError('Effect must be "h"eal, "s"peed or "d"amage, with +"int" or without')
