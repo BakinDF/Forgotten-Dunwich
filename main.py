@@ -19,6 +19,8 @@ door = None
 delt = None
 # money, health
 player_params = []
+small_eps = 5
+eps = 20
 
 
 def generate_level(level):
