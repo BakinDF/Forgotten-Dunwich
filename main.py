@@ -16,8 +16,7 @@ trap_group = pygame.sprite.Group()
 enemy_group = pygame.sprite.Group()
 text = None
 door = None
-
-delt_x, delt_y = 0, 0
+delt = None
 # money, health
 player_params = []
 
@@ -351,20 +350,20 @@ class Camera:
         self.dy = 0
 
     def apply(self, obj):
-        obj.rect.x += self.dx
-        obj.rect.y += self.dy
-        try:
-            obj.col_rect.x += self.dx
-            obj.col_rect.y += self.dy
-        except AttributeError:
-            pass
+        if isinstance(obj, Tile):
+            obj.move(self.dx, self.dy)
+        else:
+            obj.rect.x += self.dx
+            obj.rect.y += self.dy
+            try:
+                obj.col_rect.x += self.dx
+                obj.col_rect.y += self.dy
+            except AttributeError:
+                pass
 
     def update(self, target):
-        global delt_x, delt_y
         self.dx = -(target.rect.x + target.rect.w // 2 - width // 2)
         self.dy = -(target.rect.y + target.rect.h // 2 - height // 2)
-        delt_x -= self.dx
-        delt_y -= self.dy
 
 
 class Goblin(pygame.sprite.Sprite):
@@ -657,6 +656,9 @@ class Player(pygame.sprite.Sprite):
 
 class Tile(pygame.sprite.Sprite):
     def __init__(self, type, pos_x, pos_y, *groups):
+        self.first = False
+        if pos_x == 0 and pos_y == 0:
+            self.first = True
         groups = list(groups)
         groups.append(all_sprites)
         super().__init__(groups)
@@ -679,6 +681,13 @@ class Tile(pygame.sprite.Sprite):
         if self.type in ['road', 'grass', 'roof', 'floor_4', 'floor_3', 'floor_2', 'coin', 'green_wall_2']:
             return False
         return True
+
+    def move(self, x, y):
+        self.rect.x += x
+        self.rect.y += y
+        if self.first:
+            global delt
+            delt = list((self.rect.x, self.rect.y))
 
 
 class Trap(pygame.sprite.Sprite):
@@ -784,7 +793,7 @@ def find_path(path, x1, y1, x2, y2):
                 data[i][j] = -1
             else:
                 data[i][j] = 0
-    a = [print(i) for i in data]
+    # a = [print(i) for i in data]
     lest = deepcopy(data)
     lest[x1][y1] = 1
     lest[x2][y2] = 0
@@ -866,6 +875,16 @@ def render_text(line):
     font = pygame.font.Font(None, 50)
     text = font.render(line, 1, (255, 255, 255))
     return text
+
+
+def get_cell(x, y):
+    pos = ((x - delt[0]) // tile_size, (y - delt[1]) // tile_size)
+    return pos
+
+
+def get_cell_coords(w, h):
+    pos = (w * tile_size + delt[0], h * tile_size + delt[1])
+    return pos
 
 
 # nothing, but it works)
@@ -954,3 +973,4 @@ while running:
     screen.blit(render_info(player, screen), (0, 0))
     pygame.display.flip()
     clock.tick(fps)
+    #print(get_cell_coords(*get_cell(*player.get_coords())))
