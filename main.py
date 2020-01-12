@@ -1,6 +1,14 @@
 import pygame
-from abc import abstractmethod, ABC
+import sys
+import traceback
 
+
+def hook(*args, **kwargs):
+    traceback.print_last()
+    input()
+
+
+sys.excepthook = hook
 pygame.init()
 size = width, height = 1100, 700
 screen = pygame.display.set_mode(size)  # , pygame.FULLSCREEN)
@@ -130,9 +138,9 @@ class Product(pygame.sprite.Sprite):
         self.disc = prod.get_disc()
         self.price = prod.get_price()
         self.name = prod.get_name()
+        self.prod = prod
         # example
-        """self.prod = prod
-        self.disc = '123\n456\n\n789'
+        """self.disc = '123\n456\n\n789'
         self.price = 456
         self.name = 'the first product
         self.image = pygame.transform.scale(tile_images["empty"], (w, h))"""
@@ -143,7 +151,7 @@ class Product(pygame.sprite.Sprite):
         return self.price
 
     # returns sprite with black background and text information in the corner
-    def show_info(self, screen):
+    def show_info(self, screen, group):
         size = screen.get_rect()
         w, h = size.w, size.h
         new = pygame.display.set_mode((w, h))
@@ -171,7 +179,7 @@ class Product(pygame.sprite.Sprite):
         gr.add(image_sprite)
         gr.draw(new)
 
-        info_sprite = pygame.sprite.Sprite()
+        info_sprite = pygame.sprite.Sprite(group)
         info_sprite.image = pygame.transform.scale(new, (w, h))
         info_sprite.rect = info_sprite.image.get_rect()
 
@@ -198,13 +206,18 @@ class PotionShop(Building):
         selected_prod = None
         Button(width - 50, 0, 50, 50, load_image("data/other/exit_button.png",
                                                  (0, 0, 255), (50, 50)), shop_interface_end, products, buttons)
+
         buy_image = render_text('Buy!')
         Button(900, 600, buy_image.get_width(), buy_image.get_height(), buy_image,
-               None, buttons)
+               buy_function, buttons)
+
+        # Сгенерировать предметы
+        order = 'hsd'
         for i in range(5):
-            for j in range(5):
-                heal = Potion(f's+{i + j}', 200, potionshop_group)
-                Product(100 + i * 50, 100 + j * 50, 50, 50, heal, products)
+            for j in range(3):
+                potion = Potion(f'{order[j]}{"+" + str(i) if i else ""}', 200, potionshop_group)
+                Product(100 + i * 50, 100 + j * 50, 50, 50, potion, products)
+
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -218,25 +231,32 @@ class PotionShop(Building):
                     for prod in products:
                         if prod.rect.collidepoint(pos):
                             if isinstance(prod, Product):
-                                info_screen = prod.show_info(screen)
+                                info_screen = prod.show_info(screen, shop_buttons)
                                 shop_buttons.add(info_screen)
                                 selected_prod = prod
+
                     # if we clicked on button
                     for btn in buttons:
                         if btn.rect.collidepoint(pos) and isinstance(btn, Button):
-                            try:
-                                running = btn.run(btn)
-                            except TypeError:
-                                pass
-            data = pygame.key.get_pressed()
+                            if btn.func is shop_interface_end:
+                                try:
+                                    running = btn.run(btn)
+                                except TypeError:
+                                    pass
+                            elif btn.func is buy_function:
+                                btn.run(player, selected_prod, info_screen)
+
             screen.fill((0, 0, 0))
-            '''if info_screen:
-                info_screen.blit(screen, (0, 0))'''
             shop_buttons.draw(screen)
             products.draw(screen)
             buttons.draw(screen)
+
+            coins = render_text(f'Coins: {player.get_money()}')
+            screen.blit(coins, (20, 20))
+
             pygame.display.flip()
             clock.tick(fps)
+
         # deleting all buttons
         for btn in buttons:
             shop_interface_end(btn)
@@ -720,8 +740,8 @@ class Item(pygame.sprite.Sprite):
 class Potion(Item):
     # Базовые усиления
     heal = 25
-    speed = 2
-    damage = 1
+    speed = 0.5
+    damage = 0.5
 
     def __init__(self, title, price, *groups):
         super().__init__(groups)
@@ -740,11 +760,11 @@ class Potion(Item):
         elif self.effect == 's':
             image = load_image(r'data\potions\speed_potion.png', -1)
             self.text = 'Зелье Скорости' + (f' +{self.coof - 1}' if self.coof > 1 else '')
-            self.disc = f'Ускоряет персонажа в {int(self.speed * ((self.coof + 1) / 2))} раз'
+            self.disc = f'Ускоряет персонажа в {self.speed + ((self.coof + 4) / 5)} раз'
         elif self.effect == 'd':
             image = load_image(r'data\potions\damage_potion.png', -1)
             self.text = 'Зелье Урона' + (f' +{self.coof - 1}' if self.coof > 1 else '')
-            self.disc = f'Увеличивает урон персонажа в {int(self.damage + ((self.coof + 9) / 10))} раз'
+            self.disc = f'Увеличивает урон персонажа в {self.damage + ((self.coof + 9) / 10)} раз'
         else:
             raise ValueError('Effect must be "h"eal, "s"peed or "d"amage, with +"int" or without')
         self.name = self.text
@@ -755,9 +775,9 @@ class Potion(Item):
         if self.effect == 'h':
             player.set_health(player.get_health() + int(self.heal * ((self.coof + 1) / 2)))
         elif self.effect == 's':
-            player.set_speed(player.get_speed() + int(self.speed * (self.coof / 2 + 1)))
+            player.set_speed(player.get_speed() + self.speed + ((self.coof + 4) / 5))
         elif self.effect == 'd':
-            player.set_damage_boost(player.get_damage_boost() + int(self.damage + ((self.coof + 9) / 10)))
+            player.set_damage_boost(player.get_damage_boost() + self.damage + ((self.coof + 9) / 10))
         self.kill()
 
 
@@ -908,6 +928,14 @@ def render_text(line):
     font = pygame.font.Font(None, 50)
     text = font.render(line, 1, (255, 255, 255))
     return text
+
+
+def buy_function(player, chosen_product, info_screen):
+    if chosen_product:
+        player.add_product(chosen_product.prod)
+        chosen_product.prod.kill()
+        chosen_product.kill()
+        info_screen.kill()
 
 
 # nothing, but it works)
