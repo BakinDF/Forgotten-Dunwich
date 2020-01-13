@@ -274,6 +274,77 @@ class Shop(Building):
         super().__init__("shop", pos_x, pos_y, groups)
         self.name = 'Shop'
 
+        # enter is called when we enter he building
+    def enter(self, player):
+        buttons = pygame.sprite.Group()
+        size = screen.get_rect()
+        width, height = size.w, size.h
+        fps = 60
+        shop_buttons = pygame.sprite.Group()
+        products = pygame.sprite.Group()
+        running = True
+        clock = pygame.time.Clock()
+        pos = (0, 0)
+        info_screen = None
+        selected_prod = None
+        Button(width - 50, 0, 50, 50, load_image("data/other/exit_button.png",
+                                                 (0, 0, 255), (50, 50)), shop_interface_end,
+               products, buttons)
+
+        buy_image = render_text('Buy!')
+        Button(900, 600, buy_image.get_width(), buy_image.get_height(), buy_image,
+               buy_function, buttons)
+
+        # Сгенерировать предметы
+        order = ['g', 'r', 'sr', 'k', 'p']
+        for i in range(5):
+            potion = Weapon(f'{order[i]}', 12, 400, potionshop_group)
+            Product(100 + i * 50, 100, 50, 50, potion, products)
+
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    quit()
+                    running = False
+                if event.type == pygame.MOUSEMOTION:
+                    pos = event.pos
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    pos = event.pos
+                    # if we clicked on product
+                    for prod in products:
+                        if prod.rect.collidepoint(pos):
+                            if isinstance(prod, Product):
+                                info_screen = prod.show_info(screen, shop_buttons)
+                                shop_buttons.add(info_screen)
+                                selected_prod = prod
+
+                    # if we clicked on button
+                    for btn in buttons:
+                        if btn.rect.collidepoint(pos) and isinstance(btn, Button):
+                            if btn.func is shop_interface_end:
+                                try:
+                                    running = btn.run(btn)
+                                except TypeError:
+                                    pass
+                            elif btn.func is buy_function:
+                                btn.run(player, selected_prod, info_screen)
+
+            screen.fill((0, 0, 0))
+            shop_buttons.draw(screen)
+            products.draw(screen)
+            buttons.draw(screen)
+
+            coins = render_text(f'Coins: {player.get_money()}')
+            screen.blit(coins, (20, 20))
+
+            pygame.display.flip()
+            clock.tick(fps)
+
+        # deleting all buttons
+        for btn in buttons:
+            shop_interface_end(btn)
+        potionshop_group.empty()
+
 
 class CathedralEasy(Building):
     def __init__(self, pos_x, pos_y, *groups):
@@ -721,6 +792,7 @@ class Item(pygame.sprite.Sprite):
         price_label = font.render(str(self.price), 1, (0, 255, 0))
         self.image.blit(price_label, (int((image_size - price_label.get_rect().w) / 2), int(image_size * 0.8) + 6))
 
+
     def get_image(self):
         return self._img
 
@@ -769,7 +841,7 @@ class Potion(Item):
             raise ValueError('Effect must be "h"eal, "s"peed or "d"amage, with +"int" or without')
         self.name = self.text
         self._img = image
-        # self.change_image(image)
+
 
     def do_effect(self, player):
         if self.effect == 'h':
@@ -796,7 +868,7 @@ class Weapon(Item):
             self.firerate = 0
             self.name = 'Граната'
             self.text = self.name
-            self.change_image(load_image(r'data\weapons\grenade.png'))
+            self._img = load_image(r'data\weapons\grenade.png')
 
             def decorator(func):
                 def function(self, *args, **kwargs):
@@ -809,25 +881,25 @@ class Weapon(Item):
             self.name = 'АК-47'
             self.text = self.name
             self.firerate = 50
-            self.change_image(load_image(r'data\weapons\rifle.png'))
+            self._img = load_image(r'data\weapons\rifle.png')
         elif title == 'sr':  # Снайперская винтовка
             self.name = 'Снайперская винтовка'
             self.text = self.name
             self.firerate = 5000
-            self.change_image(load_image(r'data\weapons\sniper_rifle.png'))
+            self._img = load_image(r'data\weapons\sniper_rifle.png')
         elif title == 'k':  # Нож
             self.name = 'Нож'
             self.text = self.name
             self.firerate = 1000
-            self.change_image(load_image(r'data\weapons\knife.png'))
+            self._img = load_image(r'data\weapons\knife.png')
         elif title == 'p':  # Пистолет
             self.name = 'Пистолет'
             self.text = self.name
             self.firerate = 500
-            self.change_image(load_image(r'data\weapons\pistol.png'))
+            self._img = load_image(r'data\weapons\pistol.png')
         else:
             raise ValueError('There is not weapon with this title.')
-
+        self.disc = f"Наносит {self.damage} урона."
     def do_damage(self, pos):
         self.timer += self.clock.tick()
         if self.timer >= self.firerate:
@@ -835,6 +907,7 @@ class Weapon(Item):
             for sprite in enemies:  # Группа спрайтов с врагами
                 if sprite.rect.collidepoint(pos):
                     sprite.get_damage(self.damage)  # У врагов должна быть функция get_damage(damage)
+
 
 
 def cut_sheet(sheet, columns, rows, number=0):
@@ -931,7 +1004,7 @@ def render_text(line):
 
 
 def buy_function(player, chosen_product, info_screen):
-    if chosen_product:
+    if player.change_money(-chosen_product.prod.get_price()):
         player.add_product(chosen_product.prod)
         chosen_product.prod.kill()
         chosen_product.kill()
