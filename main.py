@@ -20,7 +20,7 @@ delt = None
 # money, health
 player_params = []
 small_eps = 5
-eps = 30
+eps = 50
 
 
 def generate_level(level):
@@ -428,16 +428,19 @@ class Goblin(pygame.sprite.Sprite):
         self.health = health
 
     def move_point(self, pos):
+        cell_mid = 30
         if not self.target:
             way = find_path('data/levels/lvl_1.dat', *get_cell(*self.get_coords()), *get_cell(*player.get_coords()))[1:]
             if not way:
                 return
             way = [(9, 6)]
-            self.target = (way[0][0] * tile_size + tile_size // 2, way[0][1] * tile_size + tile_size // 2)
+            self.target = (way[0][0] * tile_size + tile_size // 2 - cell_mid, way[0][1] * tile_size + tile_size // 2 - cell_mid)
         else:
             goblin_coords = self.get_x() - delt[0], self.get_y() - delt[1]
             target_coords = self.target[0] - delt[0], self.target[1] - delt[1]
+            print(goblin_coords, target_coords)
             dist = distance(goblin_coords, target_coords)
+            #print(dist)
             if dist < eps:
                 self.target = None
         if self.target:
