@@ -374,7 +374,7 @@ class Camera:
 
 class Goblin(pygame.sprite.Sprite):
     speed = 1
-    size_decrease = 30
+    size_decrease = 70
 
     def __init__(self, x, y, *groups):
         super().__init__(groups)
@@ -391,8 +391,8 @@ class Goblin(pygame.sprite.Sprite):
         # self.image = self.frames[self.frame_num]
         self.image = self.frames['right'][self.frame_num]
         self.rect = self.image.get_rect()
-        self.rect.x = x * tile_size + delt_x
-        self.rect.y = y * tile_size + delt_y
+        self.rect.x = x * tile_size
+        self.rect.y = y * tile_size
         self.prev_coords = self.get_coords()
         self.num = 0
         self.pos = (self.rect.x + 1, self.rect.y)
@@ -429,23 +429,20 @@ class Goblin(pygame.sprite.Sprite):
 
     def move_point(self, pos):
         if not self.target:
-            way = find_path('data/levels/lvl_1.dat', *get_cell(*self.get_coords()), *get_cell(*player.get_coords()))
-            if way:
-                self.target = [way[0][0], 28 - way[0][1]]
-                print(way)
-            else:
+            way = find_path('data/levels/lvl_1.dat', *get_cell(*self.get_coords()), *get_cell(*player.get_coords()))[1:]
+            if not way:
                 return
+            way = [(9, 6)]
+            self.target = (way[0][0] * tile_size + tile_size // 2, way[0][1] * tile_size + tile_size // 2)
         else:
-            coords_goblin = (self.get_x() - delt[0], self.get_y() - delt[1])
-            coords_target = (self.target[0] * tile_size, self.target[1] * tile_size)[::-1]
-            dist = distance(coords_goblin, coords_target)
+            goblin_coords = self.get_x() - delt[0], self.get_y() - delt[1]
+            target_coords = self.target[0] - delt[0], self.target[1] - delt[1]
+            dist = distance(goblin_coords, target_coords)
             if dist < eps:
                 self.target = None
-                return
         if self.target:
-            print(self.target)
-            x, y = (self.target[0] * tile_size + delt[0], self.target[1] * tile_size + delt[0])[::-1]
-            print(self.get_coords(), (x, y))
+            x, y = self.target
+            x, y = x + delt[0], y + delt[1]
             self.prev_coords = self.get_coords()
             self.rect.x += 0.01 * (Goblin.speed * x - self.rect.x)
             self.rect.y += 0.01 * (Goblin.speed * y - self.rect.y)
@@ -908,7 +905,7 @@ def render_text(line):
 
 
 def get_cell(x, y):
-    pos = ((x - delt[0]) // tile_size, (y - delt[1]) // tile_size)
+    pos = (((x - delt[0]) // tile_size)), ((y - delt[1]) // tile_size)
     return pos[::-1]
 
 
