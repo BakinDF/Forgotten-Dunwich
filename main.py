@@ -1,5 +1,6 @@
 import pygame
 from copy import deepcopy
+from random import randint
 
 pygame.init()
 size = width, height = 1100, 700
@@ -20,12 +21,11 @@ delt = None
 # money, health
 player_params = []
 small_eps = 5
-eps = 50
+eps = 70
 
 
 def generate_level(level):
     new_player, x, y = None, None, None
-    was_goblin = False
     for y in range(len(level)):
         for x in range(len(level[y])):
             if level[y][x] == 'f':
@@ -67,8 +67,7 @@ def generate_level(level):
             elif level[y][x] == 'b':
                 Tile('dark', x, y)
             elif level[y][x] == 'c':
-                # Tile('green_wall', x, y)
-                Tile('coin', x, y)
+                Tile('coin_grass', x, y)
             elif level[y][x] == '7':
                 Tile('floor_2', x, y)
             elif level[y][x] == '8':
@@ -76,10 +75,7 @@ def generate_level(level):
             elif level[y][x] == '9':
                 Tile('floor_4', x, y)
             elif level[y][x] == 'e':
-                if not was_goblin:
-                    Goblin(x + 1, y + 1, enemy_group, all_sprites)
-                    #quit()
-                    was_goblin = True
+                Goblin(x, y, enemy_group, all_sprites)
                 Tile('green_wall_2', x, y)
 
     return new_player, x, y
@@ -374,7 +370,9 @@ class Camera:
 
 class Goblin(pygame.sprite.Sprite):
     speed = 1
-    size_decrease = 70
+    size_decrease = 60
+    cell_mid = 50
+    col_delt = 20
 
     def __init__(self, x, y, *groups):
         super().__init__(groups)
@@ -383,10 +381,12 @@ class Goblin(pygame.sprite.Sprite):
         self.frame_num = 0
         for i in range(5):
             self.frames["left"].append(load_image(f'data/characters/goblin_left_{str(i + 1)}.png',
-                                                  colorkey=(255, 0, 0), size=(tile_size - Goblin.size_decrease, tile_size - Goblin.size_decrease)))
+                                                  colorkey=(255, 0, 0), size=(
+                    tile_size - Goblin.size_decrease, tile_size - Goblin.size_decrease)))
         for i in range(5):
             self.frames["right"].append(load_image(f'data/characters/goblin_right_{str(i + 1)}.png',
-                                                   colorkey=(255, 0, 0), size=(tile_size - Goblin.size_decrease, tile_size - Goblin.size_decrease)))
+                                                   colorkey=(255, 0, 0), size=(
+                    tile_size - Goblin.size_decrease, tile_size - Goblin.size_decrease)))
 
         # self.image = self.frames[self.frame_num]
         self.image = self.frames['right'][self.frame_num]
@@ -396,8 +396,8 @@ class Goblin(pygame.sprite.Sprite):
         self.prev_coords = self.get_coords()
         self.num = 0
         self.pos = (self.rect.x + 1, self.rect.y)
-        self.col_rect = pygame.Rect(self.rect.x - building_collide_step, self.rect.y - building_collide_step,
-                                    self.rect.w + building_collide_step, self.rect.h + building_collide_step)
+        self.col_rect = pygame.Rect(self.rect.x + Goblin.col_delt, self.rect.y + Goblin.col_delt,
+                                    self.rect.w - Goblin.col_delt, self.rect.h - Goblin.col_delt)
         self.health = 100
         self.damage = 20
 
@@ -405,7 +405,6 @@ class Goblin(pygame.sprite.Sprite):
         self.hit_counter = 0
 
         self.target = None
-
 
     def get_damage(self):
         if self.hit_mode:
@@ -428,27 +427,26 @@ class Goblin(pygame.sprite.Sprite):
         self.health = health
 
     def move_point(self, pos):
-        cell_mid = 30
         if not self.target:
             way = find_path('data/levels/lvl_1.dat', *get_cell(*self.get_coords()), *get_cell(*player.get_coords()))[1:]
             if not way:
                 return
-            way = [(9, 6)]
-            self.target = (way[0][0] * tile_size + tile_size // 2 - cell_mid, way[0][1] * tile_size + tile_size // 2 - cell_mid)
+            for i in range(len(way)):
+                way[i] = way[i][::-1]
+            if len(way) > 1:
+                self.target = (way[1][0] * tile_size + Goblin.cell_mid, way[1][1] * tile_size + Goblin.cell_mid)
         else:
             goblin_coords = self.get_x() - delt[0], self.get_y() - delt[1]
-            target_coords = self.target[0] - delt[0], self.target[1] - delt[1]
-            print(goblin_coords, target_coords)
+            target_coords = self.target
             dist = distance(goblin_coords, target_coords)
-            #print(dist)
             if dist < eps:
                 self.target = None
         if self.target:
             x, y = self.target
             x, y = x + delt[0], y + delt[1]
             self.prev_coords = self.get_coords()
-            self.rect.x += 0.01 * (Goblin.speed * x - self.rect.x)
-            self.rect.y += 0.01 * (Goblin.speed * y - self.rect.y)
+            self.rect.x += 0.02 * (Goblin.speed * x - self.rect.x) + randint(0, 2)
+            self.rect.y += 0.02 * (Goblin.speed * y - self.rect.y) + randint(0, 2)
 
             if check_collisions(self):
                 self.rect.x = self.prev_coords[0]
@@ -499,7 +497,7 @@ class Goblin(pygame.sprite.Sprite):
 # notice new methods of getting helth, money, rect
 # notice new attributes (money, health)
 class Player(pygame.sprite.Sprite):
-    speed = 20
+    speed = 10
 
     def __init__(self, x, y, *groups):
         super().__init__(groups)
@@ -696,18 +694,20 @@ class Tile(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x = pos_x * tile_size
         self.rect.y = pos_y * tile_size
+        self.pos = (pos_x, pos_y)
         self.col_rect = pygame.Rect(self.rect.x - building_collide_step, self.rect.y - building_collide_step,
                                     self.rect.w + building_collide_step, self.rect.h + building_collide_step)
-        if type == 'coin':
+        if type == 'coin_grass':
             self.value = 1000
         else:
             self.value = 0
-
+    def get_pos(self):
+        return self.pos
     def get_value(self):
         return self.value
 
     def is_obstacle(self):
-        if self.type in ['road', 'grass', 'roof', 'floor_4', 'floor_3', 'floor_2', 'coin', 'green_wall_2']:
+        if self.type in ['road', 'grass', 'roof', 'floor_4', 'floor_3', 'floor_2', 'coin_grass', 'green_wall_2']:
             return False
         return True
 
@@ -782,12 +782,17 @@ def check_collisions(obj):
     global text
     a = None
     del_objects = []
+    if isinstance(obj, Goblin):
+        return False
     for sprite in all_sprites:
         if id(sprite) == id(obj):
             continue
         if sprite.rect.colliderect(obj.rect):
-            if isinstance(obj, Player) and isinstance(sprite, Tile) and sprite.type == 'coin':
+            if isinstance(obj, Player) and isinstance(sprite, Tile) and sprite.type == 'coin_grass':
                 obj.change_money(sprite.get_value())
+                a = Tile('grass', *sprite.get_pos())
+                a.rect.x += delt[0]
+                a.rect.y += delt[1]
                 sprite.kill()
             if sprite.is_obstacle():
                 check_active_zones(obj)
@@ -940,8 +945,10 @@ tile_images = {"road": load_image("data/textures/stone_1.png", (255, 0, 0), (til
                "green_wall": load_image("data/textures/green_wall.png", (255, 0, 0), (tile_size, tile_size)),
                "dark": load_image("data/textures/eye.png", (255, 0, 0), (tile_size, tile_size)),
                "trap": load_image("data/textures/trap.png", (255, 0, 0), (tile_size, tile_size)),
-               'green_wall_2': load_image("data/textures/green_wall.png", (255, 0, 0), (tile_size, tile_size))
+               'green_wall_2': load_image("data/textures/green_wall.png", (255, 0, 0), (tile_size, tile_size)),
+               "coin_grass": load_image("data/textures/grass.png", (255, 0, 0), (tile_size, tile_size))
                }
+tile_images['coin_grass'].blit(tile_images['coin'], (0, 0))
 tile_images['road'].set_alpha(150)
 player, level_x, level_y = generate_level(load_level('data/levels/city.dat'))
 fps = 60
