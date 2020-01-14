@@ -379,6 +379,7 @@ class CathedralEasy(Building):
                         btn.check_selection(pos)
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     pos = event.pos
+                    player.shoot(pos)
                     for btn in button_group:
                         if btn.rect.collidepoint(pos):
                             running = btn.run()
@@ -465,9 +466,10 @@ class Camera:
 
 class Goblin(pygame.sprite.Sprite):
     speed = 1
-    size_decrease = 60
+    size_decrease = 50
     cell_mid = 50
     col_delt = 20
+    moving_eps = 600
 
     def __init__(self, x, y, *groups):
         super().__init__(groups)
@@ -506,6 +508,11 @@ class Goblin(pygame.sprite.Sprite):
             return 0
         return self.damage
 
+    def receive_damage(self, damage):
+        self.health -= damage
+        if self.health <= 0:
+            self.kill()
+
     def get_health(self):
         return self.health
 
@@ -537,15 +544,19 @@ class Goblin(pygame.sprite.Sprite):
             if dist < eps:
                 self.target = None
         if self.target:
-            x, y = self.target
-            x, y = x + delt[0], y + delt[1]
-            self.prev_coords = self.get_coords()
-            self.rect.x += 0.02 * (Goblin.speed * x - self.rect.x) + randint(0, 2)
-            self.rect.y += 0.02 * (Goblin.speed * y - self.rect.y) + randint(0, 2)
+            goblin_coords = self.get_x() - delt[0], self.get_y() - delt[1]
+            target_coords = player.get_x() - delt[0], player.get_y() - delt[1]
+            dist = distance(goblin_coords, target_coords)
+            if dist < Goblin.moving_eps:
+                x, y = self.target
+                x, y = x + delt[0], y + delt[1]
+                self.prev_coords = self.get_coords()
+                self.rect.x += 0.02 * (Goblin.speed * x - self.rect.x) + randint(0, 2)
+                self.rect.y += 0.02 * (Goblin.speed * y - self.rect.y) + randint(0, 2)
 
-            if check_collisions(self):
-                self.rect.x = self.prev_coords[0]
-                self.rect.y = self.prev_coords[1]
+                if check_collisions(self):
+                    self.rect.x = self.prev_coords[0]
+                    self.rect.y = self.prev_coords[1]
 
     def hit(self):
         self.hit_mode = True
@@ -628,8 +639,9 @@ class Player(pygame.sprite.Sprite):
         self.col_rect = pygame.Rect(self.rect.x - building_collide_step, self.rect.y - building_collide_step,
                                     self.rect.w + building_collide_step, self.rect.h + building_collide_step)
         self.health = 100
-        self.poisons = []
+        self.potions = []
         self.weapons = []
+        self.current_weapon = None
         self.money = 0
 
         self.load_params()
@@ -638,19 +650,24 @@ class Player(pygame.sprite.Sprite):
     def load_params(self):
         global player_params
         if player_params:
-            self.money = player_params[0]
-            self.health = player_params[1]
+            self.money, self.health, self.weapons, self.potions, self.current_weapon = player_params
 
     def write_params(self):
         global player_params
-        player_params = [self.money, self.health]
+        player_params = [self.money, self.health, self.weapons, self.potions, self.current_weapon]
 
     def add_product(self, prod):
         if isinstance(prod, Weapon):
             self.weapons.append(prod)
         elif isinstance(prod, Potion):
-            self.poisons.append(prod)
+            self.potions.append(prod)
+        if not self.current_weapon and self.weapons:
+            self.current_weapon = self.weapons[0]
         return True
+
+    def shoot(self, pos):
+        if self.current_weapon:
+            self.current_weapon.do_damage(pos)
 
     def move_left(self):
         x, y = pos
@@ -1008,7 +1025,7 @@ class Weapon(Item):
             self.timer = 0
             for sprite in enemy_group:  # Группа спрайтов с врагами
                 if sprite.rect.collidepoint(pos):
-                    sprite.get_damage(self.damage)  # У врагов должна быть функция get_damage(damage)
+                    sprite.receive_damage(self.damage)  # У врагов должна быть функция receive_damage(damage)
 
 
 def cut_sheet(sheet, columns, rows, number=0):
