@@ -412,12 +412,13 @@ class CathedralEasy(Building):
             for sprite in all_sprites:
                 camera.apply(sprite)
             all_sprites.update(pos)
+            all_sprites.draw(screen)
             for enemy in enemy_group:
                 enemy.move_point(player.get_coords())
                 if enemy.rect.colliderect(player.rect):
                     player.get_damage(enemy.get_damage())
                     enemy.hit()
-            all_sprites.draw(screen)
+                screen.blit(enemy.health_bar, (enemy.rect.x, enemy.rect.y - 25))
             button_group.draw(screen)
             buildings_group.draw(screen)
             trap_group.draw(screen)
@@ -467,7 +468,7 @@ class Camera:
 class Goblin(pygame.sprite.Sprite):
     speed = 1
     size_decrease = 50
-    cell_mid = 50
+    cell_mid = -25
     col_delt = 20
     moving_eps = 600
 
@@ -502,6 +503,7 @@ class Goblin(pygame.sprite.Sprite):
         self.hit_counter = 0
 
         self.target = None
+        self.health_bar = render_text(f'Health: {self.health}', 20)
 
     def get_damage(self):
         if self.hit_mode:
@@ -510,6 +512,7 @@ class Goblin(pygame.sprite.Sprite):
 
     def receive_damage(self, damage):
         self.health -= damage
+        self.health_bar = render_text(f'Health: {self.health}', 20)
         if self.health <= 0:
             self.kill()
 
@@ -557,6 +560,7 @@ class Goblin(pygame.sprite.Sprite):
                 if check_collisions(self):
                     self.rect.x = self.prev_coords[0]
                     self.rect.y = self.prev_coords[1]
+
 
     def hit(self):
         self.hit_mode = True
@@ -1183,8 +1187,8 @@ def render_info(player, screen):
 
 # renders any text
 # returns Surface
-def render_text(line):
-    font = pygame.font.Font(None, 50)
+def render_text(line, size=50):
+    font = pygame.font.Font(None, size)
     text = font.render(line, 1, (255, 255, 255))
     return text
 
