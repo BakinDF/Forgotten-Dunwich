@@ -3,6 +3,8 @@ import sys
 import traceback
 from copy import deepcopy
 from random import randint
+
+
 def hook(*args, **kwargs):
     traceback.print_last()
     input()
@@ -276,6 +278,7 @@ class Shop(Building):
         self.name = 'Shop'
 
         # enter is called when we enter he building
+
     def enter(self, player):
         buttons = pygame.sprite.Group()
         size = screen.get_rect()
@@ -793,8 +796,10 @@ class Tile(pygame.sprite.Sprite):
             self.value = 1000
         else:
             self.value = 0
+
     def get_pos(self):
         return self.pos
+
     def get_value(self):
         return self.value
 
@@ -890,7 +895,6 @@ class Item(pygame.sprite.Sprite):
         price_label = font.render(str(self.price), 1, (0, 255, 0))
         self.image.blit(price_label, (int((image_size - price_label.get_rect().w) / 2), int(image_size * 0.8) + 6))
 
-
     def get_image(self):
         return self._img
 
@@ -939,7 +943,6 @@ class Potion(Item):
             raise ValueError('Effect must be "h"eal, "s"peed or "d"amage, with +"int" or without')
         self.name = self.text
         self._img = image
-
 
     def do_effect(self, player):
         if self.effect == 'h':
@@ -998,6 +1001,7 @@ class Weapon(Item):
         else:
             raise ValueError('There is not weapon with this title.')
         self.disc = f"Наносит {self.damage} урона."
+
     def do_damage(self, pos):
         self.timer += self.clock.tick()
         if self.timer >= self.firerate:
@@ -1005,7 +1009,6 @@ class Weapon(Item):
             for sprite in enemy_group:  # Группа спрайтов с врагами
                 if sprite.rect.collidepoint(pos):
                     sprite.get_damage(self.damage)  # У врагов должна быть функция get_damage(damage)
-
 
 
 def cut_sheet(sheet, columns, rows, number=0):
@@ -1177,7 +1180,6 @@ def get_cell(x, y):
 def get_cell_coords(w, h):
     pos = (w * tile_size + delt[0], h * tile_size + delt[1])
     return pos
-
 
 
 def buy_function(player, chosen_product, info_screen):
