@@ -25,12 +25,14 @@ button_group = pygame.sprite.Group()
 player_info_group = pygame.sprite.Group()
 trap_group = pygame.sprite.Group()
 enemy_group = pygame.sprite.Group()
+weapon_group = pygame.sprite.Group()
 text = None
 door = None
 delt = None
 # money, health
 player_params = []
 
+sprites_size = 200
 small_eps = 5
 eps = 70
 goblin_pause = [0] * 700 + [1] * 5
@@ -665,6 +667,7 @@ class Player(pygame.sprite.Sprite):
         self.weapons = []
         self.current_weapon = None
         self.money = 0
+        self.potion_group = pygame.sprite.Group()
 
         self.load_params()
 
@@ -679,12 +682,15 @@ class Player(pygame.sprite.Sprite):
         player_params = [self.money, self.health, self.weapons, self.potions, self.current_weapon]
 
     def add_product(self, prod):
+        prod.change_image(prod._img, sprites_size)
         if isinstance(prod, Weapon):
             self.weapons.append(prod)
+            weapon_group.add(prod)
         elif isinstance(prod, Potion):
             self.potions.append(prod)
+            potion_group.add(prod)
         if not self.current_weapon and self.weapons:
-            self.current_weapon = self.weapons[0]
+            self.equip_weapon(0)
         return True
 
     def shoot(self, pos):
@@ -789,6 +795,21 @@ class Player(pygame.sprite.Sprite):
         if check_collisions(self):
             self.rect.x = self.prev_coords[0]
             self.rect.y = self.prev_coords[1]
+
+    def equip_weapon(self, num):
+        if self.weapons[num:num + 1]:
+            self.current_weapon = self.weapons[num]
+            self.change_weapons(20, 400, 10)
+
+    def change_weapons(self, x, y, spaces):
+        last_x = x
+        for index, weapon in enumerate(self.weapons):
+            if weapon is self.current_weapon:
+                weapon.change_image(weapon._img, (0, 255, 0))
+            else:
+                weapon.change_image(weapon._img)
+            weapon.rect.x, weapon.rect.y = last_x, y
+            last_x += (weapon.rect.w + spaces)
 
     def set_moving(self, value):
         self.moving = bool(value)
@@ -908,30 +929,31 @@ class Button(pygame.sprite.Sprite):
 
 
 class Item(pygame.sprite.Sprite):
-    def change_image(self, image, image_size=200):
+    def change_image(self, image, color=(255, 255, 255), image_size=200):
+        color = pygame.Color(color)
         self.image = pygame.Surface((image_size,) * 2)
         self.rect = self.image.get_rect()
         image = resize_image(image, int(image_size * 0.6))
         x = image.get_rect().w
         self.image.blit(image, ((image_size - x) // 2, int(image_size * 0.2)))
-        pygame.draw.rect(self.image, (0, 255, 0), self.image.get_rect(), 3)
+        pygame.draw.rect(self.image, color, self.image.get_rect(), 3)
 
         size = 1
         font = pygame.font.Font(None, size)
-        text_label = font.render(self.text, 1, (0, 255, 0))
-        price_label = font.render(str(self.price), 1, (0, 255, 0))
+        text_label = font.render(self.text, 1, color)
+        price_label = font.render(str(self.price), 1, color)
 
         while text_label.get_rect().w <= image_size and price_label.get_rect().h <= image_size * 0.18 and price_label.get_rect().w <= image_size and text_label.get_rect().h <= image_size * 0.18:
             size += 1
             font = pygame.font.Font(None, size)
-            text_label = font.render(self.text, 1, (0, 255, 0))
-            price_label = font.render(str(self.price), 1, (0, 255, 0))
+            text_label = font.render(self.text, 1, color)
+            price_label = font.render(str(self.price), 1, color)
 
         font = pygame.font.Font(None, size - 1)
-        text_label = font.render(self.text, 1, (0, 255, 0))
+        text_label = font.render(self.text, 1, color)
         self.image.blit(text_label, (int((image_size - text_label.get_rect().w) / 2), 1))
 
-        price_label = font.render(str(self.price), 1, (0, 255, 0))
+        price_label = font.render(str(self.price), 1, color)
         self.image.blit(price_label, (int((image_size - price_label.get_rect().w) / 2), int(image_size * 0.8) + 6))
 
     def get_image(self):
@@ -1309,6 +1331,11 @@ while running:
     button_group.draw(screen)
     buildings_group.draw(screen)
     player_group.draw(screen)
+    weapon_group.draw(screen)
+    for sprite in weapon_group:
+        print(sprite.rect.x, sprite.rect.y)
+    if player.weapons:
+        print(player.weapons[0])
     if text:
         screen.blit(text, (0, height - 30))
     screen.blit(render_info(player, screen), (0, 0))
