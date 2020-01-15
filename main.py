@@ -563,7 +563,7 @@ class Goblin(pygame.sprite.Sprite):
             self.rect.x = self.prev_coords[0]
             self.rect.y = self.prev_coords[1]
 '''
-        x = self.pos[0]
+        x = player.get_x()
         self.num += 1
         if self.num == 16:
             self.frame_num = (self.frame_num + 1) % (len(self.frames['left']) - 2)
