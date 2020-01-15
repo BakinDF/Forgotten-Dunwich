@@ -2,7 +2,7 @@ import pygame
 import sys
 import traceback
 from copy import deepcopy
-from random import randint
+from random import randint, choice, shuffle
 
 
 def hook(*args, **kwargs):
@@ -30,8 +30,16 @@ door = None
 delt = None
 # money, health
 player_params = []
+
 small_eps = 5
 eps = 70
+goblin_pause = [0] * 700 + [1] * 5
+shuffle(goblin_pause)
+
+# damage, firetime, price
+weapon_data = {'g': [100, 2000, 5000], 'r': [150, 500, 12000],
+               'sr': [100, 1500, 15000], 'k': [40, 2000, 5000],
+               'p': [100, 700, 7000]}
 
 
 def generate_level(level):
@@ -157,7 +165,7 @@ class Product(pygame.sprite.Sprite):
     def show_info(self, screen, group):
         size = screen.get_rect()
         w, h = size.w, size.h
-        new = pygame.display.set_mode((w, h))
+        new = pygame.Surface((w, h))
         new.fill((0, 0, 0))
 
         font = pygame.font.Font(None, 50)
@@ -302,7 +310,7 @@ class Shop(Building):
         # Сгенерировать предметы
         order = ['g', 'r', 'sr', 'k', 'p']
         for i in range(5):
-            potion = Weapon(f'{order[i]}', 12, 400, potionshop_group)
+            potion = Weapon(f'{order[i]}', potionshop_group)
             Product(100 + i * 50, 100, 50, 50, potion, products)
 
         while running:
@@ -382,7 +390,7 @@ class CathedralEasy(Building):
                     player.shoot(pos)
                     for btn in button_group:
                         if btn.rect.collidepoint(pos):
-                            running = btn.run()
+                            running = False
             data = pygame.key.get_pressed()
             player.set_moving(False)
             if data[119]:
@@ -505,6 +513,9 @@ class Goblin(pygame.sprite.Sprite):
         self.target = None
         self.health_bar = render_text(f'Health: {self.health}', 20)
 
+        self.moving = True
+        self.moving_num = 0
+
     def get_damage(self):
         if self.hit_mode:
             return 0
@@ -547,20 +558,26 @@ class Goblin(pygame.sprite.Sprite):
             if dist < eps:
                 self.target = None
         if self.target:
-            goblin_coords = self.get_x() - delt[0], self.get_y() - delt[1]
-            target_coords = player.get_x() - delt[0], player.get_y() - delt[1]
-            dist = distance(goblin_coords, target_coords)
-            if dist < Goblin.moving_eps:
-                x, y = self.target
-                x, y = x + delt[0], y + delt[1]
-                self.prev_coords = self.get_coords()
-                self.rect.x += 0.02 * (Goblin.speed * x - self.rect.x) + randint(0, 2)
-                self.rect.y += 0.02 * (Goblin.speed * y - self.rect.y) + randint(0, 2)
+            prob = choice(goblin_pause)
+            print(prob)
+            if prob:
+                self.moving = False
+                self.moving_num = 0
+            if (not self.moving and self.moving_num > 10) or self.moving:
+                self.moving = True
+                goblin_coords = self.get_x() - delt[0], self.get_y() - delt[1]
+                target_coords = player.get_x() - delt[0], player.get_y() - delt[1]
+                dist = distance(goblin_coords, target_coords)
+                if dist < Goblin.moving_eps:
+                    x, y = self.target
+                    x, y = x + delt[0], y + delt[1]
+                    self.prev_coords = self.get_coords()
+                    self.rect.x += 0.02 * (Goblin.speed * x - self.rect.x) + randint(0, 2)
+                    self.rect.y += 0.02 * (Goblin.speed * y - self.rect.y) + randint(0, 2)
 
-                if check_collisions(self):
-                    self.rect.x = self.prev_coords[0]
-                    self.rect.y = self.prev_coords[1]
-
+                    if check_collisions(self):
+                        self.rect.x = self.prev_coords[0]
+                        self.rect.y = self.prev_coords[1]
 
     def hit(self):
         self.hit_mode = True
@@ -599,6 +616,7 @@ class Goblin(pygame.sprite.Sprite):
         if self.hit_counter > 100 and self.hit_mode:
             self.hit_mode = False
             self.hit_counter = 0
+        self.moving_num += 1
 
     def is_obstacle(self):
         return False
@@ -650,7 +668,7 @@ class Player(pygame.sprite.Sprite):
 
         self.load_params()
 
-    # notice calls of expected classes Weapon nd Poison
+    # notice calls of expected classes Weapon nd Potion
     def load_params(self):
         global player_params
         if player_params:
@@ -976,10 +994,9 @@ class Potion(Item):
 
 
 class Weapon(Item):
-    def __init__(self, title, damage, price, number=0, *groups):
+    def __init__(self, title, number=0, *groups):
         super().__init__(*groups)
-        self.damage = damage
-        self.price = price
+        self.damage, self.firerate, self.price = weapon_data[title]
         self.clock = pygame.time.Clock()
         self.timer = 0
 
@@ -987,7 +1004,6 @@ class Weapon(Item):
             return func
 
         if title == 'g':  # Граната
-            self.firerate = 0
             self.name = 'Граната'
             self.text = self.name
             self._img = load_image(r'data\weapons\grenade.png')
@@ -1002,22 +1018,18 @@ class Weapon(Item):
         elif title == 'r':  # AK-47
             self.name = 'АК-47'
             self.text = self.name
-            self.firerate = 50
             self._img = load_image(r'data\weapons\rifle.png')
         elif title == 'sr':  # Снайперская винтовка
             self.name = 'Снайперская винтовка'
             self.text = self.name
-            self.firerate = 5000
             self._img = load_image(r'data\weapons\sniper_rifle.png')
         elif title == 'k':  # Нож
             self.name = 'Нож'
             self.text = self.name
-            self.firerate = 1000
             self._img = load_image(r'data\weapons\knife.png')
         elif title == 'p':  # Пистолет
             self.name = 'Пистолет'
             self.text = self.name
-            self.firerate = 500
             self._img = load_image(r'data\weapons\pistol.png')
         else:
             raise ValueError('There is not weapon with this title.')
@@ -1285,6 +1297,9 @@ while running:
     if data[101]:
         if door:
             door.enter(player)
+            for i in all_sprites:
+                i.kill()
+            player, level_x, level_y = generate_level(load_level('data/levels/city.dat'))
     screen.fill((0, 0, 0))
     camera.update(player)
     for sprite in all_sprites:
