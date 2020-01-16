@@ -274,7 +274,6 @@ class PotionShop(Building):
         # deleting all buttons
         for btn in buttons:
             shop_interface_end(btn)
-        player.write_params()
         potionshop_group.empty()
 
 
@@ -359,7 +358,6 @@ class Shop(Building):
         # deleting all buttons
         for btn in buttons:
             shop_interface_end(btn)
-        player.write_params()
         potionshop_group.empty()
 
 
@@ -808,9 +806,9 @@ class Player(pygame.sprite.Sprite):
         last_x = x
         for index, weapon in enumerate(self.weapons):
             if weapon is self.current_weapon:
-                weapon.change_image(weapon._img, color=(0, 255, 0))
+                weapon.change_image(weapon._img, (0, 255, 0), image_size=sprites_size)
             else:
-                weapon.change_image(weapon._img)
+                weapon.change_image(weapon._img, image_size=sprites_size)
             weapon.rect.x, weapon.rect.y = last_x, y
             last_x += (weapon.rect.w + spaces)
 
@@ -933,8 +931,6 @@ class Button(pygame.sprite.Sprite):
 
 class Item(pygame.sprite.Sprite):
     def change_image(self, image, color=(255, 255, 255), image_size=200):
-        print(color)
-        color = pygame.Color(*color)
         self.image = pygame.Surface((image_size,) * 2)
         self.rect = self.image.get_rect()
         image = resize_image(image, int(image_size * 0.6))
@@ -1243,8 +1239,8 @@ def get_cell_coords(w, h):
 
 def buy_function(player, chosen_product, info_screen):
     if player.change_money(-chosen_product.prod.get_price()):
-        player.add_product(chosen_product.prod)
         chosen_product.prod.kill()
+        player.add_product(chosen_product.prod)
         chosen_product.kill()
         info_screen.kill()
 
@@ -1252,6 +1248,7 @@ def buy_function(player, chosen_product, info_screen):
 # nothing, but it works)
 def test():
     quit()
+
 
 tile_images = {"road": load_image("data/textures/stone_1.png", (255, 0, 0), (tile_size, tile_size)),
                "living_house": load_image("data/houses/sleep_house.png", (255, 0, 0), (tile_size * 2, tile_size)),
