@@ -26,6 +26,7 @@ player_info_group = pygame.sprite.Group()
 trap_group = pygame.sprite.Group()
 enemy_group = pygame.sprite.Group()
 weapon_group = pygame.sprite.Group()
+potion_group = pygame.sprite.Group()
 text = None
 door = None
 delt = None
@@ -273,6 +274,7 @@ class PotionShop(Building):
         # deleting all buttons
         for btn in buttons:
             shop_interface_end(btn)
+        player.write_params()
         potionshop_group.empty()
 
 
@@ -357,6 +359,7 @@ class Shop(Building):
         # deleting all buttons
         for btn in buttons:
             shop_interface_end(btn)
+        player.write_params()
         potionshop_group.empty()
 
 
@@ -682,7 +685,7 @@ class Player(pygame.sprite.Sprite):
         player_params = [self.money, self.health, self.weapons, self.potions, self.current_weapon]
 
     def add_product(self, prod):
-        prod.change_image(prod._img, sprites_size)
+        prod.change_image(prod._img, image_size=sprites_size)
         if isinstance(prod, Weapon):
             self.weapons.append(prod)
             weapon_group.add(prod)
@@ -805,7 +808,7 @@ class Player(pygame.sprite.Sprite):
         last_x = x
         for index, weapon in enumerate(self.weapons):
             if weapon is self.current_weapon:
-                weapon.change_image(weapon._img, (0, 255, 0))
+                weapon.change_image(weapon._img, color=(0, 255, 0))
             else:
                 weapon.change_image(weapon._img)
             weapon.rect.x, weapon.rect.y = last_x, y
@@ -930,7 +933,8 @@ class Button(pygame.sprite.Sprite):
 
 class Item(pygame.sprite.Sprite):
     def change_image(self, image, color=(255, 255, 255), image_size=200):
-        color = pygame.Color(color)
+        print(color)
+        color = pygame.Color(*color)
         self.image = pygame.Surface((image_size,) * 2)
         self.rect = self.image.get_rect()
         image = resize_image(image, int(image_size * 0.6))
@@ -1248,7 +1252,6 @@ def buy_function(player, chosen_product, info_screen):
 # nothing, but it works)
 def test():
     quit()
-
 
 tile_images = {"road": load_image("data/textures/stone_1.png", (255, 0, 0), (tile_size, tile_size)),
                "living_house": load_image("data/houses/sleep_house.png", (255, 0, 0), (tile_size * 2, tile_size)),
