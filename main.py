@@ -3,6 +3,7 @@ import sys
 import traceback
 from copy import deepcopy
 from random import randint
+import time
 
 
 def hook(*args, **kwargs):
@@ -32,6 +33,12 @@ delt = None
 player_params = []
 small_eps = 5
 eps = 70
+
+main_track = pygame.mixer.Sound('data/music/fight_shadow.wav')
+main_track.play(-1)
+fight_theme = pygame.mixer.Sound('data/music/fight_theme.wav')
+shoot_sound = pygame.mixer.Sound('data/music/shoot.wav')
+scream_sound = pygame.mixer.Sound('data/music/scream.wav')
 
 
 def generate_level(level):
@@ -369,6 +376,8 @@ class CathedralEasy(Building):
         camera.update(player)
         Button(width - 35, 0, 35, 35, load_image("data/other/exit_button.png", colorkey=(0, 0, 255)), lambda: False,
                button_group, buildings_group)
+        main_track.fadeout(2000)
+        fight_theme.play(-1)
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -381,7 +390,7 @@ class CathedralEasy(Building):
                     pos = event.pos
                     for btn in button_group:
                         if btn.rect.collidepoint(pos):
-                            running = btn.run()
+                            running = False
             data = pygame.key.get_pressed()
             player.set_moving(False)
             if data[119]:
@@ -427,6 +436,9 @@ class CathedralEasy(Building):
             screen.blit(render_info(player, screen), (0, 0))
             pygame.display.flip()
             clock.tick(fps)
+        fight_theme.fadeout(2000)
+        time.sleep(2.0)
+        main_track.play(-1)
 
 
 class CathedralHard(Building):
@@ -697,6 +709,7 @@ class Player(pygame.sprite.Sprite):
             self.rect.y = self.prev_coords[1]
 
     def get_damage(self, damage):
+        scream_sound.play(0)
         self.health -= damage
 
     def change_money(self, amount):
@@ -1003,6 +1016,7 @@ class Weapon(Item):
         self.disc = f"Наносит {self.damage} урона."
 
     def do_damage(self, pos):
+        shoot_sound.play(0)
         self.timer += self.clock.tick()
         if self.timer >= self.firerate:
             self.timer = 0
