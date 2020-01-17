@@ -575,7 +575,7 @@ class Goblin(pygame.sprite.Sprite):
                 way[i] = way[i][::-1]
             if len(way) > 1:
                 self.target = (
-                way[1][0] * tile_size + Goblin.cell_mid, way[1][1] * tile_size + Goblin.cell_mid)
+                    way[1][0] * tile_size + Goblin.cell_mid, way[1][1] * tile_size + Goblin.cell_mid)
         else:
             goblin_coords = self.get_x() - delt[0], self.get_y() - delt[1]
             target_coords = self.target
@@ -846,11 +846,14 @@ class Player(pygame.sprite.Sprite):
         if num == -6:
             num = 4
         if -1 < num < 5:
-            print(num, self.potions)
-            self.potions[num].do_effect(self)
-            self.potions[num].kill()
-            del self.potions[num]
-            self.change_potions(screen.get_rect().w - sprites_size - 35, 35, 10)
+            try:
+                print(num, self.potions)
+                self.potions[num].do_effect(self)
+                self.potions[num].kill()
+                del self.potions[num]
+                self.change_potions(screen.get_rect().w - sprites_size - 35, 35, 10)
+            except IndexError:
+                pass
 
     def change_potions(self, x, y, spaces):
         last_y = y
@@ -1018,7 +1021,7 @@ class Item(pygame.sprite.Sprite):
 
         price_label = font.render(str(self.disc), 1, color)
         self.image.blit(price_label, (
-        int((image_size - price_label.get_rect().w) / 2), int(image_size * 0.8) + 6))
+            int((image_size - price_label.get_rect().w) / 2), int(image_size * 0.8) + 6))
         self.image.set_colorkey((0, 0, 0))
 
     def get_image(self):
