@@ -13,7 +13,7 @@ def hook(*args, **kwargs):
 sys.excepthook = hook
 pygame.init()
 size = width, height = 1100, 700
-screen = pygame.display.set_mode(size)  # , pygame.FULLSCREEN)
+screen = pygame.display.set_mode(size, pygame.FULLSCREEN)
 tile_size = 125
 building_collide_step = 75
 all_sprites = pygame.sprite.Group()
@@ -25,8 +25,12 @@ button_group = pygame.sprite.Group()
 player_info_group = pygame.sprite.Group()
 trap_group = pygame.sprite.Group()
 enemy_group = pygame.sprite.Group()
+
+exit_group = pygame.sprite.Group()
+
 weapon_group = pygame.sprite.Group()
 potion_group = pygame.sprite.Group()
+
 text = None
 door = None
 delt = None
@@ -460,6 +464,8 @@ class CathedralEasy(Building):
             screen.blit(render_info(player, screen), (0, 0))
             pygame.display.flip()
             clock.tick(fps)
+            if player.get_health() <= 0:
+                exit_game()
 
 
 class CathedralHard(Building):
@@ -619,7 +625,7 @@ class Goblin(pygame.sprite.Sprite):
             self.rect.x = self.prev_coords[0]
             self.rect.y = self.prev_coords[1]
 '''
-        x = self.pos[0]
+        x = player.get_x()
         self.num += 1
         if self.num == 16:
             self.frame_num = (self.frame_num + 1) % (len(self.frames['left']) - 2)
@@ -1130,6 +1136,24 @@ class Weapon(Item):
                         self.damage * boost))  # У врагов должна быть функция receive_damage(damage)
 
 
+class Logo(pygame.sprite.Sprite):
+    image = load_image("data/other/game_over.png", None, (width, height))
+
+    def __init__(self, *groups):
+        super().__init__(groups)
+        self.image = Logo.image
+        self.rect = Logo.image.get_rect()
+        self.rect.x = -self.rect.w
+        self.action = True
+
+    def update(self, *args):
+        if self.action:
+            self.rect.x += 1
+            if self.rect.x >= 0:
+                self.rect.x = 0
+                self.action = False
+
+
 def cut_sheet(sheet, columns, rows, number=0):
     rect = pygame.Rect(0, 0, sheet.get_width() // columns,
                        sheet.get_height() // rows)
@@ -1312,9 +1336,40 @@ def buy_function(player, chosen_product, info_screen):
         info_screen.kill()
 
 
-# nothing, but it works)
 def test():
     quit()
+
+
+def exit_game():
+    Player.speed = 0
+    running = True
+    clock = pygame.time.Clock()
+    Logo(all_sprites, exit_group)
+    num = 0
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+        screen.fill((0, 0, 0))
+        camera.update(player)
+        for sprite in all_sprites:
+            camera.apply(sprite)
+        all_sprites.update(pos)
+        all_sprites.draw(screen)
+        button_group.draw(screen)
+        buildings_group.draw(screen)
+        player_group.draw(screen)
+        if text:
+            screen.blit(text, (0, height - 30))
+        screen.blit(render_info(player, screen), (0, 0))
+        exit_group.update()
+        exit_group.draw(screen)
+        pygame.display.flip()
+        clock.tick(fps)
+        num += 1
+        print(num)
+        if num >= 750:
+            quit()
 
 
 tile_images = {"road": load_image("data/textures/stone_1.png", (255, 0, 0), (tile_size, tile_size)),
@@ -1429,3 +1484,5 @@ while running:
     screen.blit(render_info(player, screen), (0, 0))
     pygame.display.flip()
     clock.tick(fps)
+    if player.get_health() <= 0:
+        exit_game()
