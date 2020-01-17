@@ -2,7 +2,12 @@ import pygame
 import sys
 import traceback
 from copy import deepcopy
+
+
+import time
+
 from random import randint, choice, shuffle
+
 
 
 def hook(*args, **kwargs):
@@ -47,6 +52,12 @@ shuffle(goblin_pause)
 weapon_data = {'g': [1000, 3600000, 5000], 'r': [50, 500, 12000],
                'sr': [100, 1500, 15000], 'k': [40, 2000, 5000],
                'p': [50, 700, 7000]}
+
+main_track = pygame.mixer.Sound('data/music/fight_shadow.wav')
+main_track.play(-1)
+fight_theme = pygame.mixer.Sound('data/music/fight_theme.wav')
+shoot_sound = pygame.mixer.Sound('data/music/shoot.wav')
+scream_sound = pygame.mixer.Sound('data/music/scream.wav')
 
 
 def generate_level(level):
@@ -390,6 +401,8 @@ class CathedralEasy(Building):
         Button(width - 35, 0, 35, 35,
                load_image("data/other/exit_button.png", colorkey=(0, 0, 255)), lambda: False,
                button_group, buildings_group)
+        main_track.fadeout(2000)
+        fight_theme.play(-1)
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -405,11 +418,14 @@ class CathedralEasy(Building):
                     for btn in button_group:
                         if btn.rect.collidepoint(pos):
                             running = False
+
+
                 elif event.type == pygame.KEYDOWN:
                     for i in tuple(range(54, 69)) + (48,):
                         if event.key == i:
                             player.use_potion(i - 54)
                             break
+
             data = pygame.key.get_pressed()
             player.set_moving(False)
             if data[119]:
@@ -464,9 +480,15 @@ class CathedralEasy(Building):
             screen.blit(render_info(player, screen), (0, 0))
             pygame.display.flip()
             clock.tick(fps)
+
+        
+
             if player.get_health() <= 0:
                 exit_game()
 
+    fight_theme.fadeout(2000)
+    time.sleep(2.0)
+    main_track.play(-1)
 
 class CathedralHard(Building):
     def __init__(self, pos_x, pos_y, *groups):
@@ -776,6 +798,7 @@ class Player(pygame.sprite.Sprite):
             self.rect.y = self.prev_coords[1]
 
     def get_damage(self, damage):
+        scream_sound.play(0)
         self.health -= damage
 
     def change_money(self, amount):
@@ -1126,7 +1149,13 @@ class Weapon(Item):
             raise ValueError('There is not weapon with this title.')
         self.disc = f"Наносит {self.damage} урона."
 
+
+
+        
+
     def do_damage(self, pos, boost):
+
+        shoot_sound.play(0)
         self.timer += self.clock.tick()
         if self.timer >= self.firerate:
             self.timer = 0
