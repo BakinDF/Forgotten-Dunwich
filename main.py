@@ -2,7 +2,7 @@ import pygame
 import sys
 import traceback
 from copy import deepcopy
-from random import randint
+from random import randint, choice, shuffle
 
 
 def hook(*args, **kwargs):
@@ -25,13 +25,24 @@ button_group = pygame.sprite.Group()
 player_info_group = pygame.sprite.Group()
 trap_group = pygame.sprite.Group()
 enemy_group = pygame.sprite.Group()
+weapon_group = pygame.sprite.Group()
+potion_group = pygame.sprite.Group()
 text = None
 door = None
 delt = None
 # money, health
 player_params = []
+
+sprites_size = 100
 small_eps = 5
 eps = 70
+goblin_pause = [0] * 700 + [1] * 5
+shuffle(goblin_pause)
+
+# damage, firetime, price
+weapon_data = {'g': [1000, 3600000, 5000], 'r': [50, 500, 12000],
+               'sr': [100, 1500, 15000], 'k': [40, 2000, 5000],
+               'p': [50, 700, 7000]}
 
 
 def generate_level(level):
@@ -120,8 +131,10 @@ class Building(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x = pos_x * tile_size
         self.rect.y = pos_y * tile_size
-        self.col_rect = pygame.Rect(self.rect.x - building_collide_step, self.rect.y - building_collide_step,
-                                    self.rect.w + building_collide_step * 2, self.rect.h + building_collide_step * 2)
+        self.col_rect = pygame.Rect(self.rect.x - building_collide_step,
+                                    self.rect.y - building_collide_step,
+                                    self.rect.w + building_collide_step * 2,
+                                    self.rect.h + building_collide_step * 2)
         self.name = 'not stated'
 
     def is_obstacle(self):
@@ -157,7 +170,7 @@ class Product(pygame.sprite.Sprite):
     def show_info(self, screen, group):
         size = screen.get_rect()
         w, h = size.w, size.h
-        new = pygame.display.set_mode((w, h))
+        new = pygame.Surface((w, h))
         new.fill((0, 0, 0))
 
         font = pygame.font.Font(None, 50)
@@ -208,7 +221,8 @@ class PotionShop(Building):
         info_screen = None
         selected_prod = None
         Button(width - 50, 0, 50, 50, load_image("data/other/exit_button.png",
-                                                 (0, 0, 255), (50, 50)), shop_interface_end, products, buttons)
+                                                 (0, 0, 255), (50, 50)), shop_interface_end,
+               products, buttons)
 
         buy_image = render_text('Buy!')
         Button(900, 600, buy_image.get_width(), buy_image.get_height(), buy_image,
@@ -263,6 +277,7 @@ class PotionShop(Building):
         # deleting all buttons
         for btn in buttons:
             shop_interface_end(btn)
+        player.write_params()
         potionshop_group.empty()
 
 
@@ -302,7 +317,7 @@ class Shop(Building):
         # Сгенерировать предметы
         order = ['g', 'r', 'sr', 'k', 'p']
         for i in range(5):
-            potion = Weapon(f'{order[i]}', 12, 400, potionshop_group)
+            potion = Weapon(f'{order[i]}', potionshop_group)
             Product(100 + i * 50, 100, 50, 50, potion, products)
 
         while running:
@@ -347,6 +362,7 @@ class Shop(Building):
         # deleting all buttons
         for btn in buttons:
             shop_interface_end(btn)
+        player.write_params()
         potionshop_group.empty()
 
 
@@ -367,21 +383,29 @@ class CathedralEasy(Building):
         pos = (0, 0)
         camera = Camera()
         camera.update(player)
-        Button(width - 35, 0, 35, 35, load_image("data/other/exit_button.png", colorkey=(0, 0, 255)), lambda: False,
+        Button(width - 35, 0, 35, 35,
+               load_image("data/other/exit_button.png", colorkey=(0, 0, 255)), lambda: False,
                button_group, buildings_group)
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                if event.type == pygame.MOUSEMOTION:
+                elif event.type == pygame.MOUSEMOTION:
                     pos = event.pos
                     for btn in button_group:
                         btn.check_selection(pos)
-                if event.type == pygame.MOUSEBUTTONDOWN:
+                        player.write_params()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
                     pos = event.pos
+                    player.shoot(pos)
                     for btn in button_group:
                         if btn.rect.collidepoint(pos):
-                            running = btn.run()
+                            running = False
+                elif event.type == pygame.KEYDOWN:
+                    for i in tuple(range(54, 69)) + (48,):
+                        if event.key == i:
+                            player.use_potion(i - 54)
+                            break
             data = pygame.key.get_pressed()
             player.set_moving(False)
             if data[119]:
@@ -396,6 +420,12 @@ class CathedralEasy(Building):
                 player.move_left()
                 # player.move_point(pos, False)
                 player.set_moving(Tile)
+
+            for i in range(49, 55):
+                if data[i]:
+                    player.equip_weapon(i - 49)
+                    break
+
             if data[100]:
                 player.move_right()
                 # player.move_point(pos, False)
@@ -411,12 +441,15 @@ class CathedralEasy(Building):
             for sprite in all_sprites:
                 camera.apply(sprite)
             all_sprites.update(pos)
+            all_sprites.draw(screen)
+            weapon_group.draw(screen)
+            potion_group.draw(screen)
             for enemy in enemy_group:
                 enemy.move_point(player.get_coords())
                 if enemy.rect.colliderect(player.rect):
                     player.get_damage(enemy.get_damage())
                     enemy.hit()
-            all_sprites.draw(screen)
+                screen.blit(enemy.health_bar, (enemy.rect.x, enemy.rect.y - 25))
             button_group.draw(screen)
             buildings_group.draw(screen)
             trap_group.draw(screen)
@@ -465,9 +498,10 @@ class Camera:
 
 class Goblin(pygame.sprite.Sprite):
     speed = 1
-    size_decrease = 60
-    cell_mid = 50
+    size_decrease = 50
+    cell_mid = -25
     col_delt = 20
+    moving_eps = 600
 
     def __init__(self, x, y, *groups):
         super().__init__(groups)
@@ -500,11 +534,21 @@ class Goblin(pygame.sprite.Sprite):
         self.hit_counter = 0
 
         self.target = None
+        self.health_bar = render_text(f'Health: {self.health}', 20)
+
+        self.moving = True
+        self.moving_num = 0
 
     def get_damage(self):
         if self.hit_mode:
             return 0
         return self.damage
+
+    def receive_damage(self, damage):
+        self.health -= damage
+        self.health_bar = render_text(f'Health: {self.health}', 20)
+        if self.health <= 0:
+            self.kill()
 
     def get_health(self):
         return self.health
@@ -523,13 +567,15 @@ class Goblin(pygame.sprite.Sprite):
 
     def move_point(self, pos):
         if not self.target:
-            way = find_path('data/levels/lvl_1.dat', *get_cell(*self.get_coords()), *get_cell(*player.get_coords()))[1:]
+            way = find_path('data/levels/lvl_1.dat', *get_cell(*self.get_coords()),
+                            *get_cell(*player.get_coords()))[1:]
             if not way:
                 return
             for i in range(len(way)):
                 way[i] = way[i][::-1]
             if len(way) > 1:
-                self.target = (way[1][0] * tile_size + Goblin.cell_mid, way[1][1] * tile_size + Goblin.cell_mid)
+                self.target = (
+                    way[1][0] * tile_size + Goblin.cell_mid, way[1][1] * tile_size + Goblin.cell_mid)
         else:
             goblin_coords = self.get_x() - delt[0], self.get_y() - delt[1]
             target_coords = self.target
@@ -537,15 +583,25 @@ class Goblin(pygame.sprite.Sprite):
             if dist < eps:
                 self.target = None
         if self.target:
-            x, y = self.target
-            x, y = x + delt[0], y + delt[1]
-            self.prev_coords = self.get_coords()
-            self.rect.x += 0.02 * (Goblin.speed * x - self.rect.x) + randint(0, 2)
-            self.rect.y += 0.02 * (Goblin.speed * y - self.rect.y) + randint(0, 2)
+            prob = choice(goblin_pause)
+            if prob:
+                self.moving = False
+                self.moving_num = 0
+            if (not self.moving and self.moving_num > 10) or self.moving:
+                self.moving = True
+                goblin_coords = self.get_x() - delt[0], self.get_y() - delt[1]
+                target_coords = player.get_x() - delt[0], player.get_y() - delt[1]
+                dist = distance(goblin_coords, target_coords)
+                if dist < Goblin.moving_eps:
+                    x, y = self.target
+                    x, y = x + delt[0], y + delt[1]
+                    self.prev_coords = self.get_coords()
+                    self.rect.x += 0.02 * (Goblin.speed * x - self.rect.x) + randint(0, 2)
+                    self.rect.y += 0.02 * (Goblin.speed * y - self.rect.y) + randint(0, 2)
 
-            if check_collisions(self):
-                self.rect.x = self.prev_coords[0]
-                self.rect.y = self.prev_coords[1]
+                    if check_collisions(self):
+                        self.rect.x = self.prev_coords[0]
+                        self.rect.y = self.prev_coords[1]
 
     def hit(self):
         self.hit_mode = True
@@ -584,6 +640,7 @@ class Goblin(pygame.sprite.Sprite):
         if self.hit_counter > 100 and self.hit_mode:
             self.hit_mode = False
             self.hit_counter = 0
+        self.moving_num += 1
 
     def is_obstacle(self):
         return False
@@ -593,6 +650,7 @@ class Goblin(pygame.sprite.Sprite):
 # notice new attributes (money, health)
 class Player(pygame.sprite.Sprite):
     speed = 10
+    damage_boost = 1
 
     def __init__(self, x, y, *groups):
         super().__init__(groups)
@@ -601,11 +659,13 @@ class Player(pygame.sprite.Sprite):
         self.frame_num = 0
         for i in range(9):
             if i == 0:
-                self.frames["left"].append(load_image(f'data/characters/player_left_{str(i + 1)}.png',
-                                                      colorkey=(237, 28, 36)))
+                self.frames["left"].append(
+                    load_image(f'data/characters/player_left_{str(i + 1)}.png',
+                               colorkey=(237, 28, 36)))
             else:
-                self.frames["left"].append(load_image(f'data/characters/player_left_{str(i + 1)}.png',
-                                                      colorkey=(255, 0, 0)))
+                self.frames["left"].append(
+                    load_image(f'data/characters/player_left_{str(i + 1)}.png',
+                               colorkey=(255, 0, 0)))
         for i in range(9):
             self.frames["right"].append(load_image(f'data/characters/player_right_{str(i + 1)}.png',
                                                    colorkey=(255, 0, 0)))
@@ -625,32 +685,45 @@ class Player(pygame.sprite.Sprite):
         self.prev_coords = self.get_coords()
         self.num = 0
         self.pos = (self.rect.x + 10, self.rect.y)
-        self.col_rect = pygame.Rect(self.rect.x - building_collide_step, self.rect.y - building_collide_step,
-                                    self.rect.w + building_collide_step, self.rect.h + building_collide_step)
+        self.col_rect = pygame.Rect(self.rect.x - building_collide_step,
+                                    self.rect.y - building_collide_step,
+                                    self.rect.w + building_collide_step,
+                                    self.rect.h + building_collide_step)
         self.health = 100
-        self.poisons = []
+        self.potions = []
         self.weapons = []
+        self.current_weapon = None
         self.money = 0
+        self.potion_group = pygame.sprite.Group()
 
         self.load_params()
 
-    # notice calls of expected classes Weapon nd Poison
+    # notice calls of expected classes Weapon nd Potion
     def load_params(self):
         global player_params
         if player_params:
-            self.money = player_params[0]
-            self.health = player_params[1]
+            self.money, self.health, self.weapons, self.potions, self.current_weapon = player_params
 
     def write_params(self):
         global player_params
-        player_params = [self.money, self.health]
+        player_params = [self.money, self.health, self.weapons, self.potions, self.current_weapon]
 
     def add_product(self, prod):
+        prod.change_image(prod._img, image_size=sprites_size)
         if isinstance(prod, Weapon):
             self.weapons.append(prod)
+            weapon_group.add(prod)
+            self.equip_weapon(self.weapons.index(prod))
         elif isinstance(prod, Potion):
-            self.poisons.append(prod)
+            prod.change_image(prod._img, image_size=sprites_size)
+            self.potions.append(prod)
+            potion_group.add(prod)
+            self.change_potions(screen.get_rect().w - sprites_size - 35, 35, 10)
         return True
+
+    def shoot(self, pos):
+        if self.current_weapon:
+            self.current_weapon.do_damage(pos, self.damage_boost)
 
     def move_left(self):
         x, y = pos
@@ -751,6 +824,55 @@ class Player(pygame.sprite.Sprite):
             self.rect.x = self.prev_coords[0]
             self.rect.y = self.prev_coords[1]
 
+    def equip_weapon(self, num):
+        if self.weapons[num:num + 1]:
+            self.current_weapon = self.weapons[num]
+            self.change_weapons(20, screen.get_rect().h - sprites_size - 50, 10)
+
+    def set_health(self, hp):
+        self.health = hp
+
+    def change_weapons(self, x, y, spaces):
+        last_x = x
+        for weapon in self.weapons:
+            if weapon is self.current_weapon:
+                weapon.change_image(weapon._img, (0, 255, 0), image_size=sprites_size)
+            else:
+                weapon.change_image(weapon._img, image_size=sprites_size)
+            weapon.rect.x, weapon.rect.y = last_x, y
+            last_x += (weapon.rect.w + spaces)
+
+    def use_potion(self, num):
+        if num == -6:
+            num = 4
+        if -1 < num < 5:
+            try:
+                print(num, self.potions)
+                self.potions[num].do_effect(self)
+                self.potions[num].kill()
+                del self.potions[num]
+                self.change_potions(screen.get_rect().w - sprites_size - 35, 35, 10)
+            except IndexError:
+                pass
+
+    def change_potions(self, x, y, spaces):
+        last_y = y
+        for potion in self.potions:
+            potion.rect.x, potion.rect.y = x, last_y
+            last_y += (potion.rect.h + spaces)
+
+    def get_speed(self):
+        return self.speed
+
+    def set_speed(self, speed):
+        self.speed = speed
+
+    def get_damage_boost(self):
+        return self.damage_boost
+
+    def set_damage_boost(self, boost):
+        self.damage_boost = boost
+
     def set_moving(self, value):
         self.moving = bool(value)
 
@@ -790,8 +912,10 @@ class Tile(pygame.sprite.Sprite):
         self.rect.x = pos_x * tile_size
         self.rect.y = pos_y * tile_size
         self.pos = (pos_x, pos_y)
-        self.col_rect = pygame.Rect(self.rect.x - building_collide_step, self.rect.y - building_collide_step,
-                                    self.rect.w + building_collide_step, self.rect.h + building_collide_step)
+        self.col_rect = pygame.Rect(self.rect.x - building_collide_step,
+                                    self.rect.y - building_collide_step,
+                                    self.rect.w + building_collide_step,
+                                    self.rect.h + building_collide_step)
         if type == 'coin_grass':
             self.value = 1000
         else:
@@ -804,7 +928,8 @@ class Tile(pygame.sprite.Sprite):
         return self.value
 
     def is_obstacle(self):
-        if self.type in ['road', 'grass', 'roof', 'floor_4', 'floor_3', 'floor_2', 'coin_grass', 'green_wall_2']:
+        if self.type in ['road', 'grass', 'roof', 'floor_4', 'floor_3', 'floor_2', 'coin_grass',
+                         'green_wall_2']:
             return False
         return True
 
@@ -869,31 +994,35 @@ class Button(pygame.sprite.Sprite):
 
 
 class Item(pygame.sprite.Sprite):
-    def change_image(self, image, image_size=200):
+    def change_image(self, image, color=(255, 255, 255), image_size=200):
         self.image = pygame.Surface((image_size,) * 2)
         self.rect = self.image.get_rect()
         image = resize_image(image, int(image_size * 0.6))
+        colorkey = image.get_at((0, 0))
+        image.set_colorkey(colorkey)
         x = image.get_rect().w
         self.image.blit(image, ((image_size - x) // 2, int(image_size * 0.2)))
-        pygame.draw.rect(self.image, (0, 255, 0), self.image.get_rect(), 3)
+        pygame.draw.rect(self.image, color, self.image.get_rect(), 3)
 
         size = 1
         font = pygame.font.Font(None, size)
-        text_label = font.render(self.text, 1, (0, 255, 0))
-        price_label = font.render(str(self.price), 1, (0, 255, 0))
+        text_label = font.render(self.text, 1, color)
+        price_label = font.render(str(self.disc), 1, color)
 
         while text_label.get_rect().w <= image_size and price_label.get_rect().h <= image_size * 0.18 and price_label.get_rect().w <= image_size and text_label.get_rect().h <= image_size * 0.18:
             size += 1
             font = pygame.font.Font(None, size)
-            text_label = font.render(self.text, 1, (0, 255, 0))
-            price_label = font.render(str(self.price), 1, (0, 255, 0))
+            text_label = font.render(self.text, 1, color)
+            price_label = font.render(str(self.disc), 1, color)
 
         font = pygame.font.Font(None, size - 1)
-        text_label = font.render(self.text, 1, (0, 255, 0))
+        text_label = font.render(self.text, 1, color)
         self.image.blit(text_label, (int((image_size - text_label.get_rect().w) / 2), 1))
 
-        price_label = font.render(str(self.price), 1, (0, 255, 0))
-        self.image.blit(price_label, (int((image_size - price_label.get_rect().w) / 2), int(image_size * 0.8) + 6))
+        price_label = font.render(str(self.disc), 1, color)
+        self.image.blit(price_label, (
+            int((image_size - price_label.get_rect().w) / 2), int(image_size * 0.8) + 6))
+        self.image.set_colorkey((0, 0, 0))
 
     def get_image(self):
         return self._img
@@ -930,15 +1059,16 @@ class Potion(Item):
         if self.effect == 'h':
             image = load_image(r'data\potions\healing_potion.png', -1)
             self.text = 'Зелье Лечения' + (f' +{self.coof - 1}' if self.coof > 1 else '')
-            self.disc = f'Лечит на {int(self.heal * ((self.coof + 1) / 2))} HP'
+            self.disc = f'{int(self.heal * ((self.coof + 1) / 2))} HP'
         elif self.effect == 's':
             image = load_image(r'data\potions\speed_potion.png', -1)
             self.text = 'Зелье Скорости' + (f' +{self.coof - 1}' if self.coof > 1 else '')
-            self.disc = f'Ускоряет персонажа в {self.speed + ((self.coof + 4) / 5)} раз'
+            self.disc = f'Уск. в {self.speed + ((self.coof + 4) / 5)} раз'
         elif self.effect == 'd':
             image = load_image(r'data\potions\damage_potion.png', -1)
             self.text = 'Зелье Урона' + (f' +{self.coof - 1}' if self.coof > 1 else '')
-            self.disc = f'Увеличивает урон персонажа в {self.damage + ((self.coof + 9) / 10)} раз'
+            self.disc = f'Увел. урон ' \
+                        f'в {self.damage + ((self.coof + 9) / 10)} раз'
         else:
             raise ValueError('Effect must be "h"eal, "s"peed or "d"amage, with +"int" or without')
         self.name = self.text
@@ -950,65 +1080,54 @@ class Potion(Item):
         elif self.effect == 's':
             player.set_speed(player.get_speed() + self.speed + ((self.coof + 4) / 5))
         elif self.effect == 'd':
-            player.set_damage_boost(player.get_damage_boost() + self.damage + ((self.coof + 9) / 10))
+            player.set_damage_boost(
+                player.get_damage_boost() + self.damage + ((self.coof + 9) / 10))
         self.kill()
 
 
 class Weapon(Item):
-    def __init__(self, title, damage, price, number=0, *groups):
+    def __init__(self, title, number=0, *groups):
         super().__init__(*groups)
-        self.damage = damage
-        self.price = price
+        self.damage, self.firerate, self.price = weapon_data[title]
         self.clock = pygame.time.Clock()
-        self.timer = 0
+        self.timer = self.firerate
 
         def decorator(func):
             return func
 
         if title == 'g':  # Граната
-            self.firerate = 0
             self.name = 'Граната'
             self.text = self.name
             self._img = load_image(r'data\weapons\grenade.png')
 
-            def decorator(func):
-                def function(self, *args, **kwargs):
-                    func(self, *args, **kwargs)
-                    self.kill()
-
-            self.do_damage = decorator(self.do_damage)
-
         elif title == 'r':  # AK-47
             self.name = 'АК-47'
             self.text = self.name
-            self.firerate = 50
             self._img = load_image(r'data\weapons\rifle.png')
         elif title == 'sr':  # Снайперская винтовка
             self.name = 'Снайперская винтовка'
             self.text = self.name
-            self.firerate = 5000
             self._img = load_image(r'data\weapons\sniper_rifle.png')
         elif title == 'k':  # Нож
             self.name = 'Нож'
             self.text = self.name
-            self.firerate = 1000
             self._img = load_image(r'data\weapons\knife.png')
         elif title == 'p':  # Пистолет
             self.name = 'Пистолет'
             self.text = self.name
-            self.firerate = 500
             self._img = load_image(r'data\weapons\pistol.png')
         else:
             raise ValueError('There is not weapon with this title.')
         self.disc = f"Наносит {self.damage} урона."
 
-    def do_damage(self, pos):
+    def do_damage(self, pos, boost):
         self.timer += self.clock.tick()
         if self.timer >= self.firerate:
             self.timer = 0
             for sprite in enemy_group:  # Группа спрайтов с врагами
                 if sprite.rect.collidepoint(pos):
-                    sprite.get_damage(self.damage)  # У врагов должна быть функция get_damage(damage)
+                    sprite.receive_damage(int(
+                        self.damage * boost))  # У врагов должна быть функция receive_damage(damage)
 
 
 def cut_sheet(sheet, columns, rows, number=0):
@@ -1066,7 +1185,8 @@ def check_active_zones(obj):
     for sprite in all_sprites:
         if id(sprite) == id(obj):
             continue
-        if sprite.is_obstacle() and sprite.col_rect.colliderect(obj.rect) and not isinstance(sprite, Tile):
+        if sprite.is_obstacle() and sprite.col_rect.colliderect(obj.rect) and not isinstance(sprite,
+                                                                                             Tile):
             font = pygame.font.Font(None, 50)
             text = font.render("[E] - enter " + sprite.name, 1, (47, 213, 175))
             text_x = width // 2 - text.get_width() // 2
@@ -1142,8 +1262,10 @@ def find_path(path, x1, y1, x2, y2):
 
 
 def create_col_rect(obj):
-    obj.col_rect = pygame.Rect(obj.rect.x - building_collide_step, obj.rect.y - building_collide_step,
-                               obj.rect.w + building_collide_step, obj.rect.h + building_collide_step)
+    obj.col_rect = pygame.Rect(obj.rect.x - building_collide_step,
+                               obj.rect.y - building_collide_step,
+                               obj.rect.w + building_collide_step,
+                               obj.rect.h + building_collide_step)
 
 
 # KOSTIL))   deleting buttons after shop interface
@@ -1166,8 +1288,8 @@ def render_info(player, screen):
 
 # renders any text
 # returns Surface
-def render_text(line):
-    font = pygame.font.Font(None, 50)
+def render_text(line, size=50):
+    font = pygame.font.Font(None, size)
     text = font.render(line, 1, (255, 255, 255))
     return text
 
@@ -1184,8 +1306,8 @@ def get_cell_coords(w, h):
 
 def buy_function(player, chosen_product, info_screen):
     if player.change_money(-chosen_product.prod.get_price()):
-        player.add_product(chosen_product.prod)
         chosen_product.prod.kill()
+        player.add_product(chosen_product.prod)
         chosen_product.kill()
         info_screen.kill()
 
@@ -1196,25 +1318,38 @@ def test():
 
 
 tile_images = {"road": load_image("data/textures/stone_1.png", (255, 0, 0), (tile_size, tile_size)),
-               "living_house": load_image("data/houses/sleep_house.png", (255, 0, 0), (tile_size * 2, tile_size)),
-               "poison_shop": load_image("data/houses/poison_shop.png", (255, 0, 0), (tile_size * 2, tile_size)),
-               "shop": load_image("data/houses/shop_1.png", (255, 0, 0), (tile_size * 2, tile_size * 3)),
+               "living_house": load_image("data/houses/sleep_house.png", (255, 0, 0),
+                                          (tile_size * 2, tile_size)),
+               "poison_shop": load_image("data/houses/poison_shop.png", (255, 0, 0),
+                                         (tile_size * 2, tile_size)),
+               "shop": load_image("data/houses/shop_1.png", (255, 0, 0),
+                                  (tile_size * 2, tile_size * 3)),
                "grass": load_image("data/textures/grass.png", (255, 0, 0), (tile_size, tile_size)),
                "fence": load_image("data/textures/roof_1.png", (255, 0, 0), (tile_size, tile_size)),
-               "cathedral_1": load_image("data/houses/cathedral_1.png", (255, 0, 0), (tile_size * 5, tile_size * 2)),
-               "cathedral_2": load_image("data/houses/cathedral_2.png", (255, 0, 0), (tile_size * 3, tile_size * 2)),
-               "big_house": load_image("data/houses/big_house.png", (255, 0, 0), (tile_size * 2, tile_size * 2)),
-               "empty": load_image("data/other/empty.png", (255, 0, 0), (tile_size * 2, tile_size * 2)),
+               "cathedral_1": load_image("data/houses/cathedral_1.png", (255, 0, 0),
+                                         (tile_size * 5, tile_size * 2)),
+               "cathedral_2": load_image("data/houses/cathedral_2.png", (255, 0, 0),
+                                         (tile_size * 3, tile_size * 2)),
+               "big_house": load_image("data/houses/big_house.png", (255, 0, 0),
+                                       (tile_size * 2, tile_size * 2)),
+               "empty": load_image("data/other/empty.png", (255, 0, 0),
+                                   (tile_size * 2, tile_size * 2)),
                "coin": load_image("data/textures/coin.png", (255, 0, 0), (tile_size, tile_size)),
-               "floor_4": load_image("data/textures/floor_4.png", (255, 0, 0), (tile_size, tile_size)),
-               "floor_3": load_image("data/textures/floor_3.png", (255, 0, 0), (tile_size, tile_size)),
-               "floor_2": load_image("data/textures/floor_2.png", (255, 0, 0), (tile_size, tile_size)),
+               "floor_4": load_image("data/textures/floor_4.png", (255, 0, 0),
+                                     (tile_size, tile_size)),
+               "floor_3": load_image("data/textures/floor_3.png", (255, 0, 0),
+                                     (tile_size, tile_size)),
+               "floor_2": load_image("data/textures/floor_2.png", (255, 0, 0),
+                                     (tile_size, tile_size)),
                "wall": load_image("data/textures/wall.png", (255, 0, 0), (tile_size, tile_size)),
-               "green_wall": load_image("data/textures/green_wall.png", (255, 0, 0), (tile_size, tile_size)),
+               "green_wall": load_image("data/textures/green_wall.png", (255, 0, 0),
+                                        (tile_size, tile_size)),
                "dark": load_image("data/textures/eye.png", (255, 0, 0), (tile_size, tile_size)),
                "trap": load_image("data/textures/trap.png", (255, 0, 0), (tile_size, tile_size)),
-               'green_wall_2': load_image("data/textures/green_wall.png", (255, 0, 0), (tile_size, tile_size)),
-               "coin_grass": load_image("data/textures/grass.png", (255, 0, 0), (tile_size, tile_size))
+               'green_wall_2': load_image("data/textures/green_wall.png", (255, 0, 0),
+                                          (tile_size, tile_size)),
+               "coin_grass": load_image("data/textures/grass.png", (255, 0, 0),
+                                        (tile_size, tile_size))
                }
 tile_images['coin_grass'].blit(tile_images['coin'], (0, 0))
 tile_images['road'].set_alpha(150)
@@ -1233,15 +1368,20 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        if event.type == pygame.MOUSEMOTION:
+        elif event.type == pygame.MOUSEMOTION:
             pos = event.pos
             for btn in button_group:
                 btn.check_selection(pos)
-        if event.type == pygame.MOUSEBUTTONDOWN:
+        elif event.type == pygame.MOUSEBUTTONDOWN:
             pos = event.pos
             for btn in button_group:
                 if btn.rect.collidepoint(pos):
                     btn.run()
+        elif event.type == pygame.KEYDOWN:
+            for i in tuple(range(54, 69)) + (48,):
+                if event.key == i:
+                    player.use_potion(i - 54)
+                    break
     data = pygame.key.get_pressed()
     player.set_moving(False)
     if data[119]:
@@ -1264,6 +1404,15 @@ while running:
     if data[101]:
         if door:
             door.enter(player)
+            for i in all_sprites:
+                i.kill()
+            player, level_x, level_y = generate_level(load_level('data/levels/city.dat'))
+
+    for i in range(49, 55):
+        if data[i]:
+            player.equip_weapon(i - 49)
+            break
+
     screen.fill((0, 0, 0))
     camera.update(player)
     for sprite in all_sprites:
@@ -1273,6 +1422,8 @@ while running:
     button_group.draw(screen)
     buildings_group.draw(screen)
     player_group.draw(screen)
+    weapon_group.draw(screen)
+    potion_group.draw(screen)
     if text:
         screen.blit(text, (0, height - 30))
     screen.blit(render_info(player, screen), (0, 0))
