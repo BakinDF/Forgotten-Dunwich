@@ -3,11 +3,9 @@ import sys
 import traceback
 from copy import deepcopy
 
-
 import time
 
 from random import randint, choice, shuffle
-
 
 
 def hook(*args, **kwargs):
@@ -481,14 +479,13 @@ class CathedralEasy(Building):
             pygame.display.flip()
             clock.tick(fps)
 
-        
-
             if player.get_health() <= 0:
                 exit_game()
 
     fight_theme.fadeout(2000)
     time.sleep(2.0)
     main_track.play(-1)
+
 
 class CathedralHard(Building):
     def __init__(self, pos_x, pos_y, *groups):
@@ -876,7 +873,6 @@ class Player(pygame.sprite.Sprite):
             num = 4
         if -1 < num < 5:
             try:
-                print(num, self.potions)
                 self.potions[num].do_effect(self)
                 self.potions[num].kill()
                 del self.potions[num]
@@ -1092,7 +1088,7 @@ class Potion(Item):
         elif self.effect == 's':
             image = load_image(r'data\potions\speed_potion.png', -1)
             self.text = 'Зелье Скорости' + (f' +{self.coof - 1}' if self.coof > 1 else '')
-            self.disc = f'Уск. в {self.speed + ((self.coof + 4) / 5)} раз'
+            self.disc = f'Уск. в {self.speed + ((self.coof + 2) / 3)} раз'
         elif self.effect == 'd':
             image = load_image(r'data\potions\damage_potion.png', -1)
             self.text = 'Зелье Урона' + (f' +{self.coof - 1}' if self.coof > 1 else '')
@@ -1107,7 +1103,7 @@ class Potion(Item):
         if self.effect == 'h':
             player.set_health(player.get_health() + int(self.heal * ((self.coof + 1) / 2)))
         elif self.effect == 's':
-            player.set_speed(player.get_speed() + self.speed + ((self.coof + 4) / 5))
+            player.set_speed(player.get_speed() + self.speed + ((self.coof + 2) / 3))
         elif self.effect == 'd':
             player.set_damage_boost(
                 player.get_damage_boost() + self.damage + ((self.coof + 9) / 10))
@@ -1148,10 +1144,6 @@ class Weapon(Item):
         else:
             raise ValueError('There is not weapon with this title.')
         self.disc = f"Наносит {self.damage} урона."
-
-
-
-        
 
     def do_damage(self, pos, boost):
 
@@ -1396,7 +1388,6 @@ def exit_game():
         pygame.display.flip()
         clock.tick(fps)
         num += 1
-        print(num)
         if num >= 750:
             quit()
 
