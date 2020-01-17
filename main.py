@@ -15,7 +15,7 @@ def hook(*args, **kwargs):
 
 sys.excepthook = hook
 pygame.init()
-size = width, height = 1100, 700
+size = width, height = 1280, 720
 screen = pygame.display.set_mode(size, pygame.FULLSCREEN)
 tile_size = 125
 building_collide_step = 75
