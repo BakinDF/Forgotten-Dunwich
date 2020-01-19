@@ -2,8 +2,10 @@ import pygame
 import sys
 import traceback
 from copy import deepcopy
-from random import randint, choice, shuffle
+
 import time
+
+from random import randint, choice, shuffle
 
 
 def hook(*args, **kwargs):
@@ -13,7 +15,7 @@ def hook(*args, **kwargs):
 
 sys.excepthook = hook
 pygame.init()
-size = width, height = 1100, 700
+size = width, height = 1280, 720
 screen = pygame.display.set_mode(size, pygame.FULLSCREEN)
 tile_size = 125
 building_collide_step = 75
@@ -26,9 +28,12 @@ button_group = pygame.sprite.Group()
 player_info_group = pygame.sprite.Group()
 trap_group = pygame.sprite.Group()
 enemy_group = pygame.sprite.Group()
+
 exit_group = pygame.sprite.Group()
+
 weapon_group = pygame.sprite.Group()
 potion_group = pygame.sprite.Group()
+
 text = None
 door = None
 delt = None
@@ -411,11 +416,14 @@ class CathedralEasy(Building):
                     for btn in button_group:
                         if btn.rect.collidepoint(pos):
                             running = False
+
+
                 elif event.type == pygame.KEYDOWN:
                     for i in tuple(range(54, 69)) + (48,):
                         if event.key == i:
                             player.use_potion(i - 54)
                             break
+
             data = pygame.key.get_pressed()
             player.set_moving(False)
             if data[119]:
@@ -470,11 +478,13 @@ class CathedralEasy(Building):
             screen.blit(render_info(player, screen), (0, 0))
             pygame.display.flip()
             clock.tick(fps)
+
             if player.get_health() <= 0:
                 exit_game()
-        fight_theme.fadeout(2000)
-        time.sleep(2.0)
-        main_track.play(-1)
+
+    fight_theme.fadeout(2000)
+    time.sleep(2.0)
+    main_track.play(-1)
 
 
 class CathedralHard(Building):
@@ -863,7 +873,6 @@ class Player(pygame.sprite.Sprite):
             num = 4
         if -1 < num < 5:
             try:
-                print(num, self.potions)
                 self.potions[num].do_effect(self)
                 self.potions[num].kill()
                 del self.potions[num]
@@ -1079,7 +1088,7 @@ class Potion(Item):
         elif self.effect == 's':
             image = load_image(r'data\potions\speed_potion.png', -1)
             self.text = 'Зелье Скорости' + (f' +{self.coof - 1}' if self.coof > 1 else '')
-            self.disc = f'Уск. в {self.speed + ((self.coof + 4) / 5)} раз'
+            self.disc = f'Уск. в {self.speed + ((self.coof + 2) / 3)} раз'
         elif self.effect == 'd':
             image = load_image(r'data\potions\damage_potion.png', -1)
             self.text = 'Зелье Урона' + (f' +{self.coof - 1}' if self.coof > 1 else '')
@@ -1094,7 +1103,7 @@ class Potion(Item):
         if self.effect == 'h':
             player.set_health(player.get_health() + int(self.heal * ((self.coof + 1) / 2)))
         elif self.effect == 's':
-            player.set_speed(player.get_speed() + self.speed + ((self.coof + 4) / 5))
+            player.set_speed(player.get_speed() + self.speed + ((self.coof + 2) / 3))
         elif self.effect == 'd':
             player.set_damage_boost(
                 player.get_damage_boost() + self.damage + ((self.coof + 9) / 10))
@@ -1137,6 +1146,7 @@ class Weapon(Item):
         self.disc = f"Наносит {self.damage} урона."
 
     def do_damage(self, pos, boost):
+
         shoot_sound.play(0)
         self.timer += self.clock.tick()
         if self.timer >= self.firerate:
@@ -1378,7 +1388,6 @@ def exit_game():
         pygame.display.flip()
         clock.tick(fps)
         num += 1
-        print(num)
         if num >= 750:
             quit()
 
