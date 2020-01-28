@@ -2,10 +2,10 @@ import pygame
 import sys
 import traceback
 from copy import deepcopy
-
+import os
 import time
 
-from random import randint, choice, shuffle
+from random import randint, choice, shuffle, random
 
 
 def hook(*args, **kwargs):
@@ -39,12 +39,11 @@ door = None
 delt = None
 # money, health
 player_params = []
+city_pos = None
 
 sprites_size = 100
 small_eps = 5
 eps = 70
-goblin_pause = [0] * 700 + [1] * 5
-shuffle(goblin_pause)
 
 # damage, firetime, price
 weapon_data = {'g': [1000, 3600000, 5000], 'r': [50, 500, 12000],
@@ -53,6 +52,7 @@ weapon_data = {'g': [1000, 3600000, 5000], 'r': [50, 500, 12000],
 
 main_track = pygame.mixer.Sound('data/music/fight_shadow.wav')
 main_track.play(-1)
+main_track.set_volume(0.5)
 fight_theme = pygame.mixer.Sound('data/music/fight_theme.wav')
 shoot_sound = pygame.mixer.Sound('data/music/shoot.wav')
 scream_sound = pygame.mixer.Sound('data/music/scream.wav')
@@ -251,7 +251,7 @@ class PotionShop(Building):
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    quit()
+                    sys.exit()
                     running = False
                 if event.type == pygame.MOUSEMOTION:
                     pos = event.pos
@@ -336,7 +336,7 @@ class Shop(Building):
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    quit()
+                    sys.exit()
                     running = False
                 if event.type == pygame.MOUSEMOTION:
                     pos = event.pos
@@ -482,9 +482,9 @@ class CathedralEasy(Building):
             if player.get_health() <= 0:
                 exit_game()
 
-    fight_theme.fadeout(2000)
-    time.sleep(2.0)
-    main_track.play(-1)
+        fight_theme.fadeout(2000)
+        time.sleep(2.0)
+        main_track.play(-1)
 
 
 class CathedralHard(Building):
@@ -608,8 +608,8 @@ class Goblin(pygame.sprite.Sprite):
             if dist < eps:
                 self.target = None
         if self.target:
-            prob = choice(goblin_pause)
-            if prob:
+            prob = random()
+            if prob < 0.00709:
                 self.moving = False
                 self.moving_num = 0
             if (not self.moving and self.moving_num > 10) or self.moving:
@@ -1146,10 +1146,9 @@ class Weapon(Item):
         self.disc = f"Наносит {self.damage} урона."
 
     def do_damage(self, pos, boost):
-
-        shoot_sound.play(0)
         self.timer += self.clock.tick()
         if self.timer >= self.firerate:
+            shoot_sound.play(0)
             self.timer = 0
             for sprite in enemy_group:  # Группа спрайтов с врагами
                 if sprite.rect.collidepoint(pos):
@@ -1358,7 +1357,7 @@ def buy_function(player, chosen_product, info_screen):
 
 
 def test():
-    quit()
+    sys.exit()
 
 
 def exit_game():
@@ -1389,27 +1388,27 @@ def exit_game():
         clock.tick(fps)
         num += 1
         if num >= 750:
-            quit()
+            sys.exit()
 
 
 tile_images = {"road": load_image("data/textures/stone_1.png", (255, 0, 0), (tile_size, tile_size)),
                "living_house": load_image("data/houses/sleep_house.png", (255, 0, 0),
-                                          (tile_size * 2, tile_size)),
+                                          (tile_size * 3, tile_size * 2)),
                "poison_shop": load_image("data/houses/poison_shop.png", (255, 0, 0),
-                                         (tile_size * 2, tile_size)),
+                                         (tile_size * 3, tile_size * 2)),
                "shop": load_image("data/houses/shop_1.png", (255, 0, 0),
                                   (tile_size * 2, tile_size * 3)),
                "grass": load_image("data/textures/grass.png", (255, 0, 0), (tile_size, tile_size)),
                "fence": load_image("data/textures/roof_1.png", (255, 0, 0), (tile_size, tile_size)),
                "cathedral_1": load_image("data/houses/cathedral_1.png", (255, 0, 0),
-                                         (tile_size * 5, tile_size * 2)),
+                                         (tile_size * 5, tile_size * 3)),
                "cathedral_2": load_image("data/houses/cathedral_2.png", (255, 0, 0),
-                                         (tile_size * 3, tile_size * 2)),
+                                         (tile_size * 6, tile_size * 2)),
                "big_house": load_image("data/houses/big_house.png", (255, 0, 0),
-                                       (tile_size * 2, tile_size * 2)),
+                                       (tile_size * 3, tile_size * 4)),
                "empty": load_image("data/other/empty.png", (255, 0, 0),
                                    (tile_size * 2, tile_size * 2)),
-               "coin": load_image("data/textures/coin.png", (255, 0, 0), (tile_size, tile_size)),
+               "coin": load_image("data/textures/coin.png", (255, 0, 0), (tile_size - 40, tile_size - 40)),
                "floor_4": load_image("data/textures/floor_4.png", (255, 0, 0),
                                      (tile_size, tile_size)),
                "floor_3": load_image("data/textures/floor_3.png", (255, 0, 0),
@@ -1478,11 +1477,13 @@ while running:
 
     if data[101]:
         if door:
+            city_pos = player.get_coords()
+            my_delt = delt[:]
             door.enter(player)
             for i in all_sprites:
                 i.kill()
             player, level_x, level_y = generate_level(load_level('data/levels/city.dat'))
-
+            player.rect.x, player.rect.y = city_pos[0] - my_delt[0], city_pos[1] - my_delt[1]
     for i in range(49, 55):
         if data[i]:
             player.equip_weapon(i - 49)
